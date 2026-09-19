@@ -15,7 +15,8 @@ app.use(logger());
 app.use(
   "/*",
   cors({
-    origin: ENV.CORS_ORIGIN,
+    // The website, plus Dispatch (the internal newsletter app) when configured.
+    origin: [ENV.CORS_ORIGIN, ...(ENV.DISPATCH_ORIGIN ? [ENV.DISPATCH_ORIGIN] : [])],
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
