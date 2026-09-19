@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { analyzeBody, subjectVerdict } from "./analyze";
+import { domainOf, isHardBounce } from "./deliverability";
 import { createRateLimiter } from "./rate-limit";
 import { median, rangeStart, toCsv } from "./reports";
 import { renderEmail, toPlainText } from "./render";
@@ -117,5 +118,21 @@ describe("reports helpers", () => {
 
   test("csv escaping", () => {
     expect(toCsv(["a", "b"], [["x,y", 'say "hi"']])).toBe('a,b\r\n"x,y","say ""hi"""\r\n');
+  });
+});
+
+describe("deliverability helpers", () => {
+  test("sending domain from an address", () => {
+    expect(domainOf('"The Inner War" <letters@Innerwar.app>')).toBe("innerwar.app");
+    expect(domainOf("kinz@gmail.com")).toBe("gmail.com");
+    expect(domainOf(undefined)).toBeNull();
+  });
+
+  test("only recipient rejections count as hard bounces", () => {
+    expect(isHardBounce({ responseCode: 550, command: "RCPT TO" })).toBe(true);
+    expect(isHardBounce({ responseCode: 550, code: "EENVELOPE" })).toBe(true);
+    expect(isHardBounce({ responseCode: 535, command: "AUTH PLAIN" })).toBe(false);
+    expect(isHardBounce({ responseCode: 451, command: "RCPT TO" })).toBe(false);
+    expect(isHardBounce(new Error("timeout"))).toBe(false);
   });
 });

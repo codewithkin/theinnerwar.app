@@ -2,9 +2,13 @@ import type { Database } from "@theinnerwar.app/db";
 import { normalizeEmail } from "@theinnerwar.app/db/newsletter";
 
 import { trimSlash, type NewsletterContext } from "./context";
+import { isHardBounce } from "./deliverability";
+import { createLogger, redactEmail } from "./log";
 import { renderEmail } from "./render";
 import { clickSignature, openSignature, unsubscribeToken } from "./tokens";
 import { WELCOME_DEFAULT } from "./welcome";
+
+const log = createLogger("newsletter");
 
 export type SignupMeta = {
   source?: string;
@@ -77,8 +81,11 @@ export async function sendDelivery(db: Database, nl: NewsletterContext, delivery
     include: { issue: true, subscriber: { select: { id: true, email: true } } },
   });
   const { issue, subscriber } = delivery;
+  const ctx = { deliveryId, issueId: issue.id, issue: issue.number ?? issue.kind, to: redactEmail(subscriber.email) };
+  log.debug("send start", ctx);
 
   if (!nl.mailer.enabled) {
+    log.warn("send skipped: SMTP not configured", ctx);
     await db.delivery.update({
       where: { id: delivery.id },
       data: { status: "FAILED", error: "SMTP not configured" },
@@ -119,13 +126,29 @@ export async function sendDelivery(db: Database, nl: NewsletterContext, delivery
       where: { id: delivery.id },
       data: { status: "SENT", sentAt: new Date(), messageId, error: null },
     });
+    log.info("sent", { ...ctx, messageId });
     return true;
   } catch (error) {
-    console.error("[newsletter] send failed", error);
-    await db.delivery.update({
-      where: { id: delivery.id },
-      data: { status: "FAILED", error: error instanceof Error ? error.message.slice(0, 500) : "Unknown error" },
-    });
+    const message = error instanceof Error ? error.message.slice(0, 500) : "Unknown error";
+    if (isHardBounce(error)) {
+      log.warn("hard bounce: suppressing address", { ...ctx, error });
+      // The receiving server refused this address permanently: stop mailing it.
+      await db.$transaction([
+        db.delivery.update({ where: { id: delivery.id }, data: { status: "BOUNCED", error: message } }),
+        db.subscriber.update({ where: { id: subscriber.id }, data: { status: "BOUNCED" } }),
+        db.emailEvent.create({
+          data: { type: "BOUNCE", subscriberId: subscriber.id, issueId: issue.id, deliveryId: delivery.id },
+        }),
+        db.suppression.upsert({
+          where: { email: subscriber.email },
+          create: { email: subscriber.email, reason: "HARD_BOUNCE", note: message.slice(0, 200) },
+          update: {},
+        }),
+      ]);
+      return false;
+    }
+    log.error("send failed", { ...ctx, error });
+    await db.delivery.update({ where: { id: delivery.id }, data: { status: "FAILED", error: message } });
     return false;
   }
 }
@@ -170,13 +193,18 @@ export async function subscribe(
 ): Promise<SubscribeResult> {
   const email = normalizeEmail(rawEmail);
 
+  log.info("subscribe", { email: redactEmail(email), source: meta.source, pagePath: meta.pagePath, utmSource: meta.utmSource });
   const suppressed = await db.suppression.findUnique({ where: { email } });
   if (suppressed && suppressed.reason !== "MANUAL") {
+    log.warn("subscribe refused: suppressed", { email: redactEmail(email), reason: suppressed.reason });
     throw new UndeliverableError("We can't deliver mail to this address. Try another one.");
   }
 
   const existing = await db.subscriber.findUnique({ where: { email } });
-  if (existing?.status === "ACTIVE") return { state: "already", email, emailSent: false };
+  if (existing?.status === "ACTIVE") {
+    log.info("subscribe: already active", { email: redactEmail(email) });
+    return { state: "already", email, emailSent: false };
+  }
 
   // Someone who already has an app account joins the list: link, but it is not a conversion.
   const user = await db.user.findUnique({ where: { email }, select: { id: true } });
@@ -197,12 +225,27 @@ export async function subscribe(
 
   const welcome = await ensureWelcomeIssue(db);
   const emailSent = await deliverIssue(db, nl, welcome.id, subscriber);
+  log.info("subscribed", {
+    email: redactEmail(email),
+    state: existing ? "resubscribed" : "subscribed",
+    subscriberId: subscriber.id,
+    emailSent,
+  });
   return { state: existing ? "resubscribed" : "subscribed", email, emailSent };
 }
 
 export async function unsubscribe(db: Database, subscriberId: string, reason?: string) {
   const subscriber = await db.subscriber.findUnique({ where: { id: subscriberId } });
-  if (!subscriber) return null;
+  if (!subscriber) {
+    log.warn("unsubscribe: unknown subscriber", { subscriberId });
+    return null;
+  }
+  log.info("unsubscribe", {
+    subscriberId,
+    email: redactEmail(subscriber.email),
+    reason,
+    wasActive: subscriber.status === "ACTIVE",
+  });
   if (subscriber.status === "ACTIVE") {
     await db.subscriber.update({
       where: { id: subscriber.id },
@@ -215,7 +258,8 @@ export async function unsubscribe(db: Database, subscriberId: string, reason?: s
 
 export async function recordOpen(db: Database, deliveryId: string, userAgent?: string) {
   const delivery = await db.delivery.findUnique({ where: { id: deliveryId } });
-  if (!delivery) return;
+  if (!delivery) return log.warn("open for unknown delivery", { deliveryId });
+  log.debug("open", { deliveryId, first: !delivery.openedAt });
   const now = new Date();
   await db.$transaction([
     db.emailEvent.create({
@@ -234,7 +278,8 @@ export async function recordOpen(db: Database, deliveryId: string, userAgent?: s
 
 export async function recordClick(db: Database, deliveryId: string, url: string, userAgent?: string) {
   const delivery = await db.delivery.findUnique({ where: { id: deliveryId } });
-  if (!delivery) return;
+  if (!delivery) return log.warn("click for unknown delivery", { deliveryId });
+  log.info("click", { deliveryId, url, first: !delivery.clickedAt });
   const now = new Date();
   await db.$transaction([
     db.emailEvent.create({

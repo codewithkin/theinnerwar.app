@@ -12,6 +12,8 @@ import {
   startSend,
 } from "../newsletter/broadcast";
 import { createRateLimiter } from "../newsletter/rate-limit";
+import { checkDomain, deliveryHealth, domainOf } from "../newsletter/deliverability";
+import { createLogger, redactEmail } from "../newsletter/log";
 import { renderEmail } from "../newsletter/render";
 import {
   conversionRateAt,
@@ -34,17 +36,25 @@ async function broadcastAction<T>(run: () => Promise<T>) {
   try {
     return await run();
   } catch (error) {
-    if (error instanceof BroadcastError) throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    if (error instanceof BroadcastError) {
+      log.warn("broadcast action refused", { reason: error.message });
+      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    }
+    log.error("broadcast action failed", { error });
     throw error;
   }
 }
 
-const adminProcedure = t.procedure.use(({ ctx, next }) => {
+const log = createLogger("dispatch");
+
+const adminProcedure = t.procedure.use(({ ctx, next, path, type }) => {
   const email = ctx.newsletter.admin.email;
   const token = ctx.authorization?.replace(/^Bearer\s+/i, "") ?? "";
   if (!email || !token || !verifyAdminToken(ctx.newsletter.secret, email, token)) {
+    log.warn("admin request rejected", { path, hasToken: Boolean(token), configured: Boolean(email) });
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to Dispatch" });
   }
+  log.debug("admin request", { path, type });
   return next({ ctx: { ...ctx, adminEmail: email } });
 });
 
@@ -98,7 +108,11 @@ export const dispatchRouter = router({
       }
       const ok =
         safeEqual(input.email.toLowerCase(), email.toLowerCase()) && safeEqual(input.password, password);
-      if (!ok) throw new TRPCError({ code: "UNAUTHORIZED", message: "Wrong email or password" });
+      if (!ok) {
+        log.warn("admin login failed", { ip: ctx.ip });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Wrong email or password" });
+      }
+      log.info("admin login", { ip: ctx.ip });
       return {
         token: adminToken(ctx.newsletter.secret, email, SESSION_TTL_MS),
         expiresAt: new Date(Date.now() + SESSION_TTL_MS),
@@ -190,6 +204,46 @@ export const dispatchRouter = router({
   conversions: adminProcedure
     .input(z.object({ range: z.enum(["all", "quarter", "month"]).default("all") }))
     .query(({ ctx, input }) => conversionReport(ctx.db, input.range)),
+
+  // N8 · Deliverability.
+  deliverability: adminProcedure.query(async ({ ctx }) => {
+    const settings = await getSettings(ctx.db);
+    const domain = domainOf(settings.fromAddress ?? ctx.newsletter.mailer.defaultFrom);
+    const [health, checks] = await Promise.all([
+      deliveryHealth(ctx.db),
+      domain ? checkDomain(domain, settings.dkimSelector) : Promise.resolve([]),
+    ]);
+    return { domain, dkimSelector: settings.dkimSelector, checks, checkedAt: new Date(), ...health };
+  }),
+
+  suppressions: adminProcedure
+    .input(z.object({ page: z.number().int().min(1).default(1) }))
+    .query(async ({ ctx, input }) => {
+      const [total, rows] = await Promise.all([
+        ctx.db.suppression.count(),
+        ctx.db.suppression.findMany({ orderBy: { createdAt: "desc" }, skip: (input.page - 1) * 20, take: 20 }),
+      ]);
+      return { total, rows };
+    }),
+
+  suppress: adminProcedure
+    .input(z.object({ email: z.string().trim().toLowerCase().email(), note: z.string().max(200).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.subscriber.updateMany({
+        where: { email: input.email, status: "ACTIVE" },
+        data: { status: "UNSUBSCRIBED", unsubscribedAt: new Date(), unsubscribeReason: "suppressed by admin" },
+      });
+      return ctx.db.suppression.upsert({
+        where: { email: input.email },
+        create: { email: input.email, reason: "MANUAL", note: input.note },
+        update: { note: input.note },
+      });
+    }),
+
+  unsuppress: adminProcedure.input(z.object({ email: z.string() })).mutation(async ({ ctx, input }) => {
+    await ctx.db.suppression.deleteMany({ where: { email: input.email.toLowerCase() } });
+    return { ok: true };
+  }),
 
   // N5 · Issue report.
   report: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
@@ -333,7 +387,11 @@ export const dispatchRouter = router({
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SMTP is not configured" });
       }
       const to = input.to ?? ctx.adminEmail;
-      await sendTestIssue(ctx.db, ctx.newsletter, input.id, to);
+      log.info("test send", { issueId: input.id, to: redactEmail(to) });
+      await sendTestIssue(ctx.db, ctx.newsletter, input.id, to).catch((error) => {
+        log.error("test send failed", { issueId: input.id, error });
+        throw error;
+      });
       await ctx.db.issue.update({ where: { id: input.id }, data: { lastTestAt: new Date(), lastTestTo: to } });
       return { to };
     }),
