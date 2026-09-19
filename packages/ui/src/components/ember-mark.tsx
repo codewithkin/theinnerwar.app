@@ -20,7 +20,7 @@ function EmberMark({ className, ...props }: ComponentProps<"svg">) {
 /** Mark and name, as in the site nav and footer. */
 function Wordmark({ className, ...props }: ComponentProps<"span">) {
   return (
-    <span data-slot="wordmark" className={cn("flex items-center gap-2.5", className)} {...props}>
+    <span data-slot="wordmark" className={cn("flex items-center gap-2.5 whitespace-nowrap", className)} {...props}>
       <EmberMark className="size-[15px]" />
       <span className="font-serif text-lg text-cream">The Inner War</span>
     </span>

@@ -13,7 +13,7 @@ import { heroStats, letterNote, nav, sampleLedger } from "./content";
 export function Nav() {
   return (
     <div className="flex justify-center bg-night px-4 pt-[22px] sm:px-11">
-      <nav className="flex w-full max-w-max items-center justify-between gap-[26px] rounded-full border border-white/12 bg-[rgba(29,23,18,0.9)] py-2 pr-2 pl-[22px] shadow-[0_18px_44px_rgba(0,0,0,0.5)]">
+      <nav className="flex w-full max-w-max items-center justify-between gap-3 rounded-full border border-white/12 bg-[rgba(29,23,18,0.9)] py-2 pr-2 pl-4 sm:gap-[26px] sm:pl-[22px] shadow-[0_18px_44px_rgba(0,0,0,0.5)]">
         <Link href="/" aria-label="The Inner War, home" className="no-underline">
           <Wordmark />
         </Link>
@@ -85,7 +85,7 @@ export function Hero() {
         </dl>
       </div>
 
-      <div className="relative h-[520px] flex-none border-t border-hairline lg:h-auto lg:w-[460px] lg:border-t-0 lg:border-l xl:w-[560px]">
+      <div className="relative h-[420px] flex-none border-t sm:h-[520px] border-hairline lg:h-auto lg:w-[460px] lg:border-t-0 lg:border-l xl:w-[560px]">
         <Image
           src="/images/statue-hand.jpg"
           alt=""
@@ -130,8 +130,8 @@ export function ProductCard() {
         </h2>
       </div>
 
-      <div className="relative mx-auto flex max-w-[1080px] flex-col gap-[18px] rounded-[26px] border border-white/12 bg-[rgba(23,19,16,0.92)] p-[18px] shadow-[0_44px_100px_rgba(0,0,0,0.66)] md:flex-row">
-        <div className="flex flex-none flex-col gap-[15px] rounded-[20px] border border-white/10 bg-[radial-gradient(120%_62%_at_50%_0%,#2b211a,#17130f)] p-5 md:w-[262px]">
+      <div className="relative mx-auto flex max-w-[1080px] flex-col gap-[18px] rounded-[26px] border border-white/12 bg-[rgba(23,19,16,0.92)] p-[18px] shadow-[0_44px_100px_rgba(0,0,0,0.66)] lg:flex-row">
+        <div className="flex flex-none flex-col gap-[15px] rounded-[20px] border border-white/10 bg-[radial-gradient(120%_62%_at_50%_0%,#2b211a,#17130f)] p-5 lg:w-[262px]">
           <div className="flex flex-col gap-0.5">
             <span className="text-xs text-stone-muted">Good evening, Marcus</span>
             <span className="font-serif text-[22px] text-bone italic">Defeat Resistance</span>

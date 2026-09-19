@@ -21,13 +21,13 @@ function Ledger({
   dotClassName?: string;
 }) {
   return (
-    <ol data-slot="ledger" className={cn("grid grid-cols-[repeat(15,1fr)] gap-2", className)}>
+    <ol data-slot="ledger" className={cn("grid grid-cols-[repeat(10,1fr)] gap-2 min-[400px]:grid-cols-[repeat(15,1fr)]", className)}>
       {days.map((d) => (
         <li
           key={d.dayNumber}
           aria-label={`Day ${d.dayNumber}: ${d.state}`}
           className={cn(
-            "flex aspect-square items-center justify-center rounded-full border font-mono text-[9px]",
+            "flex aspect-square min-w-0 items-center justify-center rounded-full border font-mono text-[9px]",
             stateClass[d.state],
             dotClassName,
           )}
