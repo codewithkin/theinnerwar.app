@@ -1,0 +1,22 @@
+{
+  "name": "@theinnerwar.app/api",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@theinnerwar.app/auth": "workspace:*",
+    "@theinnerwar.app/db": "workspace:*",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@theinnerwar.app/config": "workspace:*",
+    "typescript": "^6.0.3"
+  }
+}
