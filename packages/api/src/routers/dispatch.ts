@@ -3,6 +3,14 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 import { publicProcedure, router, t } from "../index";
+import { analyzeBody } from "../newsletter/analyze";
+import {
+  BroadcastError,
+  audienceCount,
+  cancelSchedule,
+  scheduleIssue,
+  startSend,
+} from "../newsletter/broadcast";
 import { createRateLimiter } from "../newsletter/rate-limit";
 import { ensureWelcomeIssue, getSettings, sendTestIssue } from "../newsletter/service";
 import { adminToken, safeEqual, verifyAdminToken } from "../newsletter/tokens";
@@ -13,6 +21,15 @@ import { adminToken, safeEqual, verifyAdminToken } from "../newsletter/tokens";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const loginLimit = createRateLimiter(10, 15 * 60 * 1000);
+
+async function broadcastAction<T>(run: () => Promise<T>) {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof BroadcastError) throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    throw error;
+  }
+}
 
 const adminProcedure = t.procedure.use(({ ctx, next }) => {
   const email = ctx.newsletter.admin.email;
@@ -237,8 +254,60 @@ export const dispatchRouter = router({
       }
       const to = input.to ?? ctx.adminEmail;
       await sendTestIssue(ctx.db, ctx.newsletter, input.id, to);
+      await ctx.db.issue.update({ where: { id: input.id }, data: { lastTestAt: new Date(), lastTestTo: to } });
       return { to };
     }),
+
+  // N4 · Preflight: everything checked before the irreversible part.
+  preflight: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const issue = await ctx.db.issue.findUnique({ where: { id: input.id } });
+    if (!issue || issue.kind !== "BROADCAST") throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
+    const [audience, settings, recent] = await Promise.all([
+      audienceCount(ctx.db),
+      getSettings(ctx.db),
+      ctx.db.issue.findMany({
+        where: { kind: "BROADCAST", status: "SENT" },
+        orderBy: { sentAt: "desc" },
+        take: 6,
+        select: { id: true, number: true, subject: true },
+      }),
+    ]);
+    const stats = await issueStats(ctx.db, recent.map((r) => r.id));
+    const analysis = analyzeBody(issue.body, ctx.newsletter.webUrl);
+    return {
+      issue,
+      audience,
+      settings,
+      canSend: ctx.newsletter.mailer.enabled,
+      analysis,
+      recent: recent.map((r) => {
+        const s = stats.get(r.id)!;
+        return { ...r, openRate: pct(s.opened, s.sent), signups: s.signups };
+      }),
+    };
+  }),
+
+  schedule: adminProcedure
+    .input(z.object({ id: z.string(), at: z.coerce.date() }))
+    .mutation(({ ctx, input }) => broadcastAction(() => scheduleIssue(ctx.db, input.id, input.at))),
+
+  cancelSchedule: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ ctx, input }) => broadcastAction(() => cancelSchedule(ctx.db, input.id))),
+
+  sendNow: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    if (!ctx.newsletter.mailer.enabled) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SMTP is not configured" });
+    }
+    return broadcastAction(() => startSend(ctx.db, input.id));
+  }),
+
+  /** Progress of a send in flight, for the preflight screen after "Send". */
+  sendProgress: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const grouped = await ctx.db.delivery.groupBy({ by: ["status"], where: { issueId: input.id }, _count: true });
+    const issue = await ctx.db.issue.findUnique({ where: { id: input.id }, select: { status: true, recipientCount: true } });
+    return { status: issue?.status, total: issue?.recipientCount ?? 0, byStatus: Object.fromEntries(grouped.map((g) => [g.status, g._count])) };
+  }),
 
   // N9 · Settings.
   settings: adminProcedure.query(({ ctx }) => getSettings(ctx.db)),

@@ -28,6 +28,8 @@ enum IssueStatus {
 
 enum DeliveryStatus {
   QUEUED
+  // Claimed by a send runner; prevents two runners sending the same email.
+  SENDING
   SENT
   FAILED
   BOUNCED
@@ -105,6 +107,9 @@ model Issue {
   scheduledFor   DateTime?
   sentAt         DateTime?
   recipientCount Int?
+  // Last "Send a test" (N3/N4 preflight).
+  lastTestAt     DateTime?
+  lastTestTo     String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deliveries     Delivery[]
@@ -126,6 +131,7 @@ model Delivery {
   messageId    String?
   error        String?
   queuedAt     DateTime       @default(now())
+  claimedAt    DateTime?
   sentAt       DateTime?
   // First open and first click; every one is also an EmailEvent.
   openedAt     DateTime?
@@ -177,6 +183,8 @@ model NewsletterSettings {
   // Usual slot for new issues: weekday 0-6 (Sunday = 0) and local "HH:MM".
   usualSlotDay  Int      @default(0)
   usualSlotTime String   @default("09:00")
+  // DKIM selector for the deliverability check (N8), e.g. "google" or "dispatch".
+  dkimSelector  String?
   // Markdown; {{ unsubscribe_url }} is replaced per recipient.
   footer        String   @default("You are getting this because you asked for it. [Unsubscribe]({{ unsubscribe_url }}) and it stops immediately.")
   updatedAt     DateTime @updatedAt

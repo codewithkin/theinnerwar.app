@@ -1,7 +1,9 @@
+import { processQueue } from "@theinnerwar.app/api/newsletter/broadcast";
 import { recordClick, recordOpen, unsubscribe } from "@theinnerwar.app/api/newsletter/service";
 import { readUnsubscribeToken, verifyClick, verifyOpen } from "@theinnerwar.app/api/newsletter/tokens";
 import { Hono } from "hono";
 
+import { ENV } from "./env.server";
 import { db, newsletter } from "./services";
 
 // Non-tRPC newsletter endpoints that mail clients hit directly.
@@ -54,3 +56,38 @@ newsletterRoutes.post("/u", async (c) => {
 newsletterRoutes.get("/u", (c) =>
   c.redirect(`${newsletter.webUrl}/unsubscribe?t=${encodeURIComponent(c.req.query("t") ?? "")}`, 302),
 );
+
+// Broadcast runner tick (Vercel Cron, or any external scheduler):
+// GET /n/cron with "Authorization: Bearer <CRON_SECRET>".
+newsletterRoutes.get("/cron", async (c) => {
+  if (!ENV.CRON_SECRET || c.req.header("authorization") !== `Bearer ${ENV.CRON_SECRET}`) {
+    return c.text("Unauthorized", 401);
+  }
+  return c.json(await processQueue(db, newsletter, { batch: ENV.NEWSLETTER_SEND_BATCH }));
+});
+
+/**
+ * In a long-running process (local dev, Docker) the server ticks the queue
+ * itself every minute. On Vercel functions don't persist, so the cron above
+ * is used instead.
+ */
+export function startNewsletterRunner(intervalMs = 60_000) {
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const result = await processQueue(db, newsletter, { batch: ENV.NEWSLETTER_SEND_BATCH });
+      if (result.started || result.sent || result.failed || result.finished) {
+        console.log("[newsletter] runner", result);
+      }
+    } catch (error) {
+      console.error("[newsletter] runner failed", error);
+    } finally {
+      running = false;
+    }
+  };
+  const timer = setInterval(tick, intervalMs);
+  void tick();
+  return () => clearInterval(timer);
+}

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { analyzeBody, subjectVerdict } from "./analyze";
 import { createRateLimiter } from "./rate-limit";
 import { renderEmail, toPlainText } from "./render";
 import {
@@ -82,4 +83,22 @@ test("rate limiter allows the limit then blocks until the window resets", () => 
   expect(allow("k", 2)).toBe(false);
   expect(allow("other", 2)).toBe(true);
   expect(allow("k", 1001)).toBe(true);
+});
+
+describe("analyzeBody", () => {
+  test("counts words and links, and finds the pitch", () => {
+    const a = analyzeBody(
+      "# Title\n\nOne two three.\n\n[Start your first campaign](https://innerwar.app/)\n\nSee https://example.com/x",
+      "https://innerwar.app",
+    );
+    expect(a.links).toEqual(["https://innerwar.app/", "https://example.com/x"]);
+    expect(a.pitchPresent).toBe(true);
+    expect(a.words).toBeGreaterThan(5);
+  });
+
+  test("no link home means no pitch", () => {
+    expect(analyzeBody("Just words.", "https://innerwar.app").pitchPresent).toBe(false);
+    expect(subjectVerdict("The hour you avoid")).toBe("GOOD");
+    expect(subjectVerdict("x".repeat(60))).toBe("LONG");
+  });
 });

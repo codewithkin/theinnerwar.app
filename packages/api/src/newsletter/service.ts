@@ -67,24 +67,16 @@ function senderFor(
 }
 
 /**
- * Sends one issue to one subscriber with open and click tracking, recording a
- * Delivery. Returns whether the mail left; failures are stored, not thrown.
+ * Renders and sends an existing delivery (one issue to one subscriber) with
+ * open and click tracking. Returns whether the mail left; failures are
+ * recorded on the delivery, not thrown.
  */
-export async function deliverIssue(
-  db: Database,
-  nl: NewsletterContext,
-  issueId: string,
-  subscriber: { id: string; email: string },
-): Promise<boolean> {
-  const [issue, settings] = await Promise.all([
-    db.issue.findUniqueOrThrow({ where: { id: issueId } }),
-    getSettings(db),
-  ]);
-  const delivery = await db.delivery.upsert({
-    where: { issueId_subscriberId: { issueId, subscriberId: subscriber.id } },
-    create: { issueId, subscriberId: subscriber.id },
-    update: { status: "QUEUED", error: null, queuedAt: new Date() },
+export async function sendDelivery(db: Database, nl: NewsletterContext, deliveryId: string): Promise<boolean> {
+  const delivery = await db.delivery.findUniqueOrThrow({
+    where: { id: deliveryId },
+    include: { issue: true, subscriber: { select: { id: true, email: true } } },
   });
+  const { issue, subscriber } = delivery;
 
   if (!nl.mailer.enabled) {
     await db.delivery.update({
@@ -94,6 +86,7 @@ export async function deliverIssue(
     return false;
   }
 
+  const settings = await getSettings(db);
   const server = trimSlash(nl.serverUrl);
   const links = unsubscribeLinks(nl, subscriber.id);
   const { html, text } = renderEmail({
@@ -124,7 +117,7 @@ export async function deliverIssue(
     });
     await db.delivery.update({
       where: { id: delivery.id },
-      data: { status: "SENT", sentAt: new Date(), messageId },
+      data: { status: "SENT", sentAt: new Date(), messageId, error: null },
     });
     return true;
   } catch (error) {
@@ -135,6 +128,21 @@ export async function deliverIssue(
     });
     return false;
   }
+}
+
+/** Sends one issue to one subscriber right now (the welcome email). */
+export async function deliverIssue(
+  db: Database,
+  nl: NewsletterContext,
+  issueId: string,
+  subscriber: { id: string; email: string },
+): Promise<boolean> {
+  const delivery = await db.delivery.upsert({
+    where: { issueId_subscriberId: { issueId, subscriberId: subscriber.id } },
+    create: { issueId, subscriberId: subscriber.id, status: "SENDING", claimedAt: new Date() },
+    update: { status: "SENDING", claimedAt: new Date(), error: null },
+  });
+  return sendDelivery(db, nl, delivery.id);
 }
 
 /** Sends an issue to an arbitrary address as a test: no delivery row, no tracking. */

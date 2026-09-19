@@ -6,7 +6,7 @@ import { logger } from "hono/logger";
 
 import { createContext } from "./context";
 import { ENV } from "./env.server";
-import { newsletterRoutes } from "./newsletter-routes";
+import { newsletterRoutes, startNewsletterRunner } from "./newsletter-routes";
 import { auth } from "./services";
 
 const app = new Hono();
@@ -39,5 +39,7 @@ app.use(
 app.get("/", (c) => {
   return c.text("OK");
 });
+
+if (ENV.NEWSLETTER_RUNNER) startNewsletterRunner();
 
 export default app;
