@@ -1,0 +1,94 @@
+// Catalog: the published content a campaign is built from.
+// Book -> Path (a 30-day campaign) -> Chapter (three per path) -> PathDay.
+
+model Book {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  title      String
+  author     String
+  year       Int?
+  coverImage String?
+  // One-line "for ..." used by the framework picker (onboarding S5).
+  pickerNote String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  paths      Path[]
+
+  @@map("book")
+}
+
+model Path {
+  id            String     @id @default(cuid())
+  slug          String     @unique
+  bookId        String
+  book          Book       @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  title         String
+  // "30 days to stop negotiating with the work that matters."
+  tagline       String?
+  // "For procrastination, overthinking the first step, and waiting to feel ready."
+  description   String
+  // Short label for the fact strip, e.g. "FOR RESISTANCE".
+  focus         String?
+  // Bullets shown on the path reveal (onboarding S8).
+  promises      String[]
+  lengthDays    Int        @default(30)
+  // Days available before a paid plan is required.
+  freeDays      Int        @default(3)
+  minutesPerDay Int        @default(15)
+  coverImage    String?
+  sortOrder     Int        @default(0)
+  published     Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  chapters      Chapter[]
+  days          PathDay[]
+  campaigns     Campaign[]
+
+  @@index([bookId])
+  @@map("path")
+}
+
+model Chapter {
+  id          String    @id @default(cuid())
+  pathId      String
+  path        Path      @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  // 1-based: I, II, III.
+  number      Int
+  title       String
+  description String
+  startDay    Int
+  endDay      Int
+  days        PathDay[]
+
+  @@unique([pathId, number])
+  @@map("chapter")
+}
+
+model PathDay {
+  id              String     @id @default(cuid())
+  pathId          String
+  path            Path       @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  chapterId       String
+  chapter         Chapter    @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  dayNumber       Int
+  // The principle, quoted or paraphrased and credited to the book.
+  principle       String
+  // e.g. "Book II, Combat".
+  principleSource String?
+  lessonBody      String
+  lessonMinutes   Int        @default(3)
+  missionTitle    String
+  missionMinutes  Int        @default(15)
+  // Ordered steps; plain strings.
+  missionSteps    String[]
+  // The "smaller version" offers (A4): [{ title, minutes }].
+  smallerMissions Json       @default("[]")
+  // Placeholder for the evidence input, e.g. "Today I proved that I can…".
+  evidencePrompt  String?
+  entries         DayEntry[]
+
+  @@unique([pathId, dayNumber])
+  @@index([chapterId])
+  @@map("path_day")
+}

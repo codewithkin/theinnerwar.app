@@ -1,0 +1,185 @@
+// Newsletter ("The Inner War" letters), administered in Dispatch
+// (designs/Newsletter). The headline metric is conversion: the share of
+// subscribers who went on to create an app account.
+//
+// Subscriber -> Delivery (one issue sent to one subscriber) -> EmailEvent
+// (opens, clicks, bounces, complaints). Issue holds both the pinned welcome
+// email and numbered broadcasts.
+
+enum SubscriberStatus {
+  ACTIVE
+  UNSUBSCRIBED
+  BOUNCED
+  COMPLAINED
+}
+
+enum IssueKind {
+  WELCOME
+  BROADCAST
+}
+
+enum IssueStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELED
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  FAILED
+  BOUNCED
+}
+
+enum EmailEventType {
+  OPEN
+  CLICK
+  BOUNCE
+  COMPLAINT
+  UNSUBSCRIBE
+}
+
+enum SuppressionReason {
+  HARD_BOUNCE
+  COMPLAINT
+  MANUAL
+}
+
+model Subscriber {
+  id     String           @id @default(cuid())
+  // Stored lowercased and trimmed.
+  email  String           @unique
+  status SubscriberStatus @default(ACTIVE)
+
+  // Where the signup came from (N6 views, source comparison).
+  source      String?
+  pagePath    String?
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  // IANA zone from the browser, for "subscriber local time" sends (N9).
+  timezone    String?
+
+  subscribedAt      DateTime  @default(now())
+  unsubscribedAt    DateTime?
+  resubscribedAt    DateTime?
+  unsubscribeReason String?
+  lastOpenedAt      DateTime?
+  lastClickedAt     DateTime?
+
+  // Conversion: set when an app account is created with this email (N7).
+  userId           String?   @unique
+  user             User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  convertedAt      DateTime?
+  // Issue credited with the signup: the last one opened or clicked within
+  // seven days before it (N5 "Matched by email address within seven days").
+  convertedIssueId String?
+  convertedIssue   Issue?    @relation("ConvertedIssue", fields: [convertedIssueId], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deliveries Delivery[]
+  events     EmailEvent[]
+
+  @@index([status])
+  @@index([subscribedAt])
+  @@index([convertedAt])
+  @@map("subscriber")
+}
+
+model Issue {
+  id             String       @id @default(cuid())
+  kind           IssueKind    @default(BROADCAST)
+  // Broadcast number shown as "ISSUE 19"; assigned when first scheduled or sent.
+  number         Int?         @unique
+  status         IssueStatus  @default(DRAFT)
+  subject        String
+  previewText    String?
+  // Markdown source written in the editor (N3).
+  body           String
+  scheduledFor   DateTime?
+  sentAt         DateTime?
+  recipientCount Int?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deliveries     Delivery[]
+  events         EmailEvent[]
+  converted      Subscriber[] @relation("ConvertedIssue")
+
+  @@index([kind, status])
+  @@map("issue")
+}
+
+model Delivery {
+  id           String         @id @default(cuid())
+  issueId      String
+  issue        Issue          @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  subscriberId String
+  subscriber   Subscriber     @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  status       DeliveryStatus @default(QUEUED)
+  // SMTP Message-ID, for matching bounces and replies.
+  messageId    String?
+  error        String?
+  queuedAt     DateTime       @default(now())
+  sentAt       DateTime?
+  // First open and first click; every one is also an EmailEvent.
+  openedAt     DateTime?
+  clickedAt    DateTime?
+  events       EmailEvent[]
+
+  @@unique([issueId, subscriberId])
+  @@index([subscriberId])
+  @@map("delivery")
+}
+
+model EmailEvent {
+  id           String         @id @default(cuid())
+  type         EmailEventType
+  subscriberId String
+  subscriber   Subscriber     @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  issueId      String?
+  issue        Issue?         @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  deliveryId   String?
+  delivery     Delivery?      @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  // Destination of a click (N5 "Where they clicked").
+  url          String?
+  userAgent    String?
+  createdAt    DateTime       @default(now())
+
+  @@index([issueId, type])
+  @@index([subscriberId, createdAt])
+  @@map("email_event")
+}
+
+// Addresses that never receive mail again, even if re-imported (N8).
+model Suppression {
+  id        String            @id @default(cuid())
+  email     String            @unique
+  reason    SuppressionReason
+  note      String?
+  createdAt DateTime          @default(now())
+
+  @@map("suppression")
+}
+
+// Sending identity and footer (N9). A single row with id "default".
+// SMTP credentials stay in environment variables, never here.
+model NewsletterSettings {
+  id            String   @id @default("default")
+  fromName      String   @default("The Inner War")
+  fromAddress   String?
+  replyTo       String?
+  // Usual slot for new issues: weekday 0-6 (Sunday = 0) and local "HH:MM".
+  usualSlotDay  Int      @default(0)
+  usualSlotTime String   @default("09:00")
+  // Markdown; {{ unsubscribe_url }} is replaced per recipient.
+  footer        String   @default("You are getting this because you asked for it. [Unsubscribe]({{ unsubscribe_url }}) and it stops immediately.")
+  updatedAt     DateTime @updatedAt
+
+  @@map("newsletter_settings")
+}

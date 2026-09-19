@@ -1,0 +1,144 @@
+// Practice: what a person does with the catalog.
+// Assessment (onboarding answers) -> Campaign (one run of a path) -> DayEntry
+// (the daily loop: lesson, mission, reflection, evidence) -> PersonalCode.
+
+enum Tone {
+  CALM
+  DIRECT
+  STRATEGIC
+  ENCOURAGING
+  NO_NONSENSE
+}
+
+enum CampaignStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum DayStatus {
+  OPEN
+  KEPT
+  MISSED
+}
+
+enum MissionVariant {
+  FULL
+  SMALLER
+}
+
+enum Difficulty {
+  EASY
+  STEADY
+  HARD
+  BRUTAL
+}
+
+enum ReminderKind {
+  MORNING_PRINCIPLE
+  MISSION_HOUR
+  EVENING_REFLECTION
+}
+
+// Onboarding answers (S3–S7). One per user; editable later in Personalization.
+model Assessment {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // S3, multi-select battle keys.
+  battles      String[]
+  // S4, single pattern key.
+  pattern      String?
+  // S5, a book slug, or null for "I am not sure".
+  bookSlug     String?
+  // S6, minutes an ordinary day can protect.
+  dailyMinutes Int       @default(15)
+  // S7.
+  tone         Tone      @default(CALM)
+  // Context used by mission variants, e.g. "work".
+  lifeArea     String?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("assessment")
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pathId      String
+  path        Path           @relation(fields: [pathId], references: [id], onDelete: Restrict)
+  status      CampaignStatus @default(ACTIVE)
+  // The day currently open, 1-based.
+  currentDay  Int            @default(1)
+  // Local "HH:MM" the person named for the mission.
+  missionHour String?
+  timezone    String         @default("UTC")
+  startedAt   DateTime       @default(now())
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  entries     DayEntry[]
+  code        PersonalCode?
+
+  @@index([userId, status])
+  @@map("campaign")
+}
+
+// One row per campaign day that has been opened. Evidence lives here, so the
+// evidence library is the list of entries with `evidence` set.
+model DayEntry {
+  id                 String          @id @default(cuid())
+  campaignId         String
+  campaign           Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  pathDayId          String
+  pathDay            PathDay         @relation(fields: [pathDayId], references: [id], onDelete: Restrict)
+  dayNumber          Int
+  status             DayStatus       @default(OPEN)
+  lessonReadAt       DateTime?
+  missionStartedAt   DateTime?
+  missionCompletedAt DateTime?
+  missionVariant     MissionVariant?
+  minutesHeld        Int?
+  // S9 "I will begin by..." on day one; the stated first move.
+  firstMove          String?
+  reflection         String?
+  difficulty         Difficulty?
+  evidence           String?
+  evidenceSavedAt    DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([campaignId, dayNumber])
+  @@index([pathDayId])
+  @@map("day_entry")
+}
+
+model PersonalCode {
+  id         String   @id @default(cuid())
+  campaignId String   @unique
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // Ordered lines of the code, written from the campaign's evidence.
+  lines      String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("personal_code")
+}
+
+model Reminder {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      ReminderKind
+  // Local "HH:MM".
+  time      String
+  enabled   Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([userId, kind])
+  @@map("reminder")
+}
