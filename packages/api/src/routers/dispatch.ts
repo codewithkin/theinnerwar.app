@@ -12,7 +12,9 @@ import {
   startSend,
 } from "../newsletter/broadcast";
 import { createRateLimiter } from "../newsletter/rate-limit";
-import { ensureWelcomeIssue, getSettings, sendTestIssue } from "../newsletter/service";
+import { renderEmail } from "../newsletter/render";
+import { conversionRateAt, growthSeries, issueCsv, issueReport } from "../newsletter/reports";
+import { ensureWelcomeIssue, getSettings, issueLabel, sendTestIssue } from "../newsletter/service";
 import { adminToken, safeEqual, verifyAdminToken } from "../newsletter/tokens";
 
 // Dispatch: the internal newsletter tool (designs/Newsletter N1–N9).
@@ -105,45 +107,112 @@ export const dispatchRouter = router({
   // N1 · Overview, conversion rate first.
   overview: adminProcedure.query(async ({ ctx }) => {
     const db = ctx.db;
-    const since = new Date(Date.now() - 30 * DAY_MS);
-    const [audience, active, converted, joined30, converted30, unsubscribed30, lastIssue, recentConverts] =
+    const now = new Date();
+    const since = new Date(now.getTime() - 30 * DAY_MS);
+    const before = new Date(now.getTime() - 60 * DAY_MS);
+    const [audience, active, converted, joined30, joinedPrev, converted30, convertedPrev, unsubscribed30, sentIssues, recentConverts, nextOut, growth, rateMonthAgo] =
       await Promise.all([
         // Everyone still reading plus everyone who converted (even if they later left).
         db.subscriber.count({ where: { OR: [{ status: "ACTIVE" }, { convertedAt: { not: null } }] } }),
         db.subscriber.count({ where: { status: "ACTIVE" } }),
         db.subscriber.count({ where: { convertedAt: { not: null } } }),
         db.subscriber.count({ where: { subscribedAt: { gte: since } } }),
+        db.subscriber.count({ where: { subscribedAt: { gte: before, lt: since } } }),
         db.subscriber.count({ where: { convertedAt: { gte: since } } }),
+        db.subscriber.count({ where: { convertedAt: { gte: before, lt: since } } }),
         db.subscriber.count({ where: { unsubscribedAt: { gte: since } } }),
-        db.issue.findFirst({ where: { kind: "BROADCAST", status: "SENT" }, orderBy: { sentAt: "desc" } }),
+        db.issue.findMany({ where: { kind: "BROADCAST", status: "SENT" }, orderBy: { sentAt: "desc" }, take: 2 }),
         db.subscriber.findMany({
-          where: { convertedAt: { not: null } },
+          where: { convertedAt: { gte: new Date(now.getTime() - 7 * DAY_MS) } },
           orderBy: { convertedAt: "desc" },
-          take: 5,
+          take: 6,
           select: { email: true, subscribedAt: true, convertedAt: true },
         }),
+        db.issue.findFirst({ where: { status: "SCHEDULED" }, orderBy: { scheduledFor: "asc" } }),
+        growthSeries(db),
+        conversionRateAt(db, since),
       ]);
-    const stats = lastIssue ? (await issueStats(db, [lastIssue.id])).get(lastIssue.id) : undefined;
+    const [lastIssue, previousIssue] = sentIssues;
+    const stats = await issueStats(db, sentIssues.map((i) => i.id));
+    const summary = (issue: typeof lastIssue) => {
+      if (!issue) return null;
+      const s = stats.get(issue.id)!;
+      return {
+        id: issue.id,
+        number: issue.number,
+        subject: issue.subject,
+        sentAt: issue.sentAt,
+        sent: s.sent,
+        openRate: pct(s.opened, s.sent),
+        clickRate: pct(s.clicked, s.sent),
+        signups: s.signups,
+      };
+    };
     return {
       activeSubscribers: active,
       converted,
       conversionRate: pct(converted, audience),
+      conversionRateMonthAgo: rateMonthAgo,
       last30Days: { joined: joined30, converted: converted30, unsubscribed: unsubscribed30 },
-      lastIssue:
-        lastIssue && stats
-          ? {
-              id: lastIssue.id,
-              number: lastIssue.number,
-              subject: lastIssue.subject,
-              sentAt: lastIssue.sentAt,
-              openRate: pct(stats.opened, stats.sent),
-              clickRate: pct(stats.clicked, stats.sent),
-              signups: stats.signups,
-            }
-          : null,
+      previous30Days: { joined: joinedPrev, converted: convertedPrev },
+      unsubscribeRate: pct(unsubscribed30, active + unsubscribed30),
+      lastIssue: summary(lastIssue),
+      previousIssue: summary(previousIssue),
+      sentCount: await db.issue.count({ where: { kind: "BROADCAST", status: "SENT" } }),
+      nextOut: nextOut && { id: nextOut.id, subject: nextOut.subject, scheduledFor: nextOut.scheduledFor },
+      growth,
       recentConverts,
     };
   }),
+
+  /** Rail badges and the "Next out" card, on every page. */
+  shell: adminProcedure.query(async ({ ctx }) => {
+    const [drafts, scheduled, nextOut] = await Promise.all([
+      ctx.db.issue.count({ where: { kind: "BROADCAST", status: "DRAFT" } }),
+      ctx.db.issue.count({ where: { status: { in: ["SCHEDULED", "SENDING"] } } }),
+      ctx.db.issue.findFirst({ where: { status: { in: ["SCHEDULED", "SENDING"] } }, orderBy: { scheduledFor: "asc" } }),
+    ]);
+    return {
+      email: ctx.adminEmail,
+      canSend: ctx.newsletter.mailer.enabled,
+      openIssues: drafts + scheduled,
+      nextOut: nextOut && { id: nextOut.id, subject: nextOut.subject, status: nextOut.status, scheduledFor: nextOut.scheduledFor },
+    };
+  }),
+
+  // N5 · Issue report.
+  report: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const issue = await ctx.db.issue.findUnique({ where: { id: input.id }, select: { id: true } });
+    if (!issue) throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
+    return issueReport(ctx.db, input.id, ctx.newsletter.webUrl);
+  }),
+
+  reportCsv: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .query(({ ctx, input }) => issueCsv(ctx.db, input.id)),
+
+  /** N3 live preview and "View the email": the real rendered HTML. */
+  preview: adminProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        subject: z.string().max(200).optional(),
+        previewText: z.string().max(200).nullish(),
+        body: z.string().max(100_000).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const saved = input.id ? await ctx.db.issue.findUnique({ where: { id: input.id } }) : null;
+      const settings = await getSettings(ctx.db);
+      return renderEmail({
+        label: issueLabel(saved ?? { kind: "BROADCAST", number: null }),
+        subject: input.subject ?? saved?.subject ?? "",
+        previewText: input.previewText ?? saved?.previewText,
+        body: input.body ?? saved?.body ?? "",
+        footer: settings.footer,
+        unsubscribeUrl: `${ctx.newsletter.webUrl}/unsubscribe`,
+      });
+    }),
 
   // N6 · Subscribers.
   subscribers: adminProcedure
