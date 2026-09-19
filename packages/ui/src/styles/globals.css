@@ -6,77 +6,128 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * The Inner War design tokens (designs/README.txt).
+ * Brand colours are fixed and exposed as Tailwind colours (bg-ember,
+ * text-bone, ...). The shadcn semantic variables below map onto them: the
+ * product is designed dark, with a bone-paper light theme.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* palette */
+  --iw-ember: #e2701f;
+  --iw-ember-light: #f2a03d;
+  --iw-ember-deep: #b8430f;
+  --iw-ember-ink: #c2551a;
+  --iw-ember-glow: #f0a557;
+  --iw-ember-pale: #f5c07a;
+  --iw-charcoal: #131110;
+  --iw-night: #0f0d0c;
+  --iw-ink: #0b0a09;
+  --iw-bone: #f4efe6;
+  --iw-cream: #f7f2e8;
+  --iw-paper: #f9f5ec;
+  --iw-muted: #a79c8e;
+  --iw-sand: #b4ada0;
+  --iw-parchment: #cfc6b8;
+  --iw-ash: #8a8478;
+  --iw-stone: #6b6558;
+  --iw-slate: #5c564d;
+  --iw-button-ink: #fff6ea;
+  --iw-hairline: rgb(255 255 255 / 0.09);
+  --iw-hairline-strong: rgb(255 255 255 / 0.12);
+
+  /* semantic (light: bone paper) */
+  --background: var(--iw-bone);
+  --foreground: #1b1a16;
+  --card: var(--iw-paper);
+  --card-foreground: #1b1a16;
+  --popover: var(--iw-paper);
+  --popover-foreground: #1b1a16;
+  --primary: var(--iw-ember);
+  --primary-foreground: var(--iw-button-ink);
+  --secondary: #e8e1d5;
+  --secondary-foreground: #1b1a16;
+  --muted: #e8e1d5;
+  --muted-foreground: #5f5a51;
+  --accent: #ecdcc8;
+  --accent-foreground: #1b1a16;
+  --destructive: #b0442e;
+  --border: #d8d0c2;
+  --input: #d8d0c2;
+  --ring: var(--iw-ember);
+  --chart-1: var(--iw-ember);
+  --chart-2: var(--iw-ember-light);
+  --chart-3: var(--iw-ember-deep);
+  --chart-4: var(--iw-muted);
+  --chart-5: var(--iw-stone);
+  --radius: 0.875rem;
+  --sidebar: var(--iw-paper);
+  --sidebar-foreground: #1b1a16;
+  --sidebar-primary: var(--iw-ember);
+  --sidebar-primary-foreground: var(--iw-button-ink);
+  --sidebar-accent: #ecdcc8;
+  --sidebar-accent-foreground: #1b1a16;
+  --sidebar-border: #d8d0c2;
+  --sidebar-ring: var(--iw-ember);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.87 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: var(--iw-charcoal);
+  --foreground: var(--iw-bone);
+  --card: #1a1613;
+  --card-foreground: var(--iw-bone);
+  --popover: #1a1613;
+  --popover-foreground: var(--iw-bone);
+  --primary: var(--iw-ember);
+  --primary-foreground: var(--iw-button-ink);
+  --secondary: rgb(255 255 255 / 0.06);
+  --secondary-foreground: var(--iw-bone);
+  --muted: rgb(255 255 255 / 0.05);
+  --muted-foreground: var(--iw-muted);
+  --accent: rgb(226 112 31 / 0.14);
+  --accent-foreground: var(--iw-cream);
+  --destructive: #c98070;
+  --border: rgb(255 255 255 / 0.1);
+  --input: rgb(255 255 255 / 0.14);
+  --ring: var(--iw-ember-glow);
+  --sidebar: var(--iw-ink);
+  --sidebar-foreground: var(--iw-bone);
+  --sidebar-primary: var(--iw-ember);
+  --sidebar-primary-foreground: var(--iw-button-ink);
+  --sidebar-accent: rgb(226 112 31 / 0.14);
+  --sidebar-accent-foreground: var(--iw-cream);
+  --sidebar-border: rgb(255 255 255 / 0.09);
+  --sidebar-ring: var(--iw-ember-glow);
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", sans-serif;
+  /* type: Newsreader for headings/principles/evidence, Archivo for UI, JetBrains Mono for labels */
+  --font-sans: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), "Newsreader", Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+
+  --color-ember: var(--iw-ember);
+  --color-ember-light: var(--iw-ember-light);
+  --color-ember-deep: var(--iw-ember-deep);
+  --color-ember-ink: var(--iw-ember-ink);
+  --color-ember-glow: var(--iw-ember-glow);
+  --color-ember-pale: var(--iw-ember-pale);
+  --color-charcoal: var(--iw-charcoal);
+  --color-night: var(--iw-night);
+  --color-ink: var(--iw-ink);
+  --color-bone: var(--iw-bone);
+  --color-cream: var(--iw-cream);
+  --color-paper: var(--iw-paper);
+  --color-stone-muted: var(--iw-muted);
+  --color-sand: var(--iw-sand);
+  --color-parchment: var(--iw-parchment);
+  --color-ash: var(--iw-ash);
+  --color-stone: var(--iw-stone);
+  --color-slate: var(--iw-slate);
+  --color-button-ink: var(--iw-button-ink);
+  --color-hairline: var(--iw-hairline);
+  --color-hairline-strong: var(--iw-hairline-strong);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -115,6 +166,26 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+}
+
+@utility bg-ember-gradient {
+  background-image: linear-gradient(100deg, var(--iw-ember), var(--iw-ember-ink));
+}
+
+/* Mono eyebrow label: "TODAY'S PRINCIPLE", "THE LEDGER". */
+@utility eyebrow {
+  font-family: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/* Newsreader display type at light weight with tight tracking. */
+@utility display {
+  font-family: var(--font-newsreader), "Newsreader", Georgia, serif;
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  text-wrap: pretty;
 }
 
 @layer base {
