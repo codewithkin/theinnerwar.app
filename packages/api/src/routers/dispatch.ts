@@ -1,0 +1,263 @@
+import type { Database, Prisma } from "@theinnerwar.app/db";
+import { TRPCError } from "@trpc/server";
+import z from "zod";
+
+import { publicProcedure, router, t } from "../index";
+import { createRateLimiter } from "../newsletter/rate-limit";
+import { ensureWelcomeIssue, getSettings, sendTestIssue } from "../newsletter/service";
+import { adminToken, safeEqual, verifyAdminToken } from "../newsletter/tokens";
+
+// Dispatch: the internal newsletter tool (designs/Newsletter N1–N9).
+// One admin, identified by DISPATCH_ADMIN_EMAIL / DISPATCH_ADMIN_PASSWORD.
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const loginLimit = createRateLimiter(10, 15 * 60 * 1000);
+
+const adminProcedure = t.procedure.use(({ ctx, next }) => {
+  const email = ctx.newsletter.admin.email;
+  const token = ctx.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+  if (!email || !token || !verifyAdminToken(ctx.newsletter.secret, email, token)) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to Dispatch" });
+  }
+  return next({ ctx: { ...ctx, adminEmail: email } });
+});
+
+const pct = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
+
+/** Sent / opened / clicked / signups per issue, for the lists and reports. */
+async function issueStats(db: Database, issueIds: string[]) {
+  const [sent, opened, clicked, signups] = await Promise.all([
+    db.delivery.groupBy({ by: ["issueId"], where: { issueId: { in: issueIds }, status: "SENT" }, _count: true }),
+    db.delivery.groupBy({ by: ["issueId"], where: { issueId: { in: issueIds }, openedAt: { not: null } }, _count: true }),
+    db.delivery.groupBy({ by: ["issueId"], where: { issueId: { in: issueIds }, clickedAt: { not: null } }, _count: true }),
+    db.subscriber.groupBy({ by: ["convertedIssueId"], where: { convertedIssueId: { in: issueIds } }, _count: true }),
+  ]);
+  const tally = (rows: { key: string | null; _count: number }[]) =>
+    new Map(rows.map((r) => [r.key, r._count]));
+  const sentBy = tally(sent.map((r) => ({ key: r.issueId, _count: r._count })));
+  const openedBy = tally(opened.map((r) => ({ key: r.issueId, _count: r._count })));
+  const clickedBy = tally(clicked.map((r) => ({ key: r.issueId, _count: r._count })));
+  const signupsBy = tally(signups.map((r) => ({ key: r.convertedIssueId, _count: r._count })));
+  return new Map(
+    issueIds.map((id) => [
+      id,
+      {
+        sent: sentBy.get(id) ?? 0,
+        opened: openedBy.get(id) ?? 0,
+        clicked: clickedBy.get(id) ?? 0,
+        signups: signupsBy.get(id) ?? 0,
+      },
+    ]),
+  );
+}
+
+const subscriberViews = {
+  everyone: {},
+  users: { convertedAt: { not: null } },
+  reading: { status: "ACTIVE", convertedAt: null, lastOpenedAt: { not: null } },
+  neverOpened: { status: "ACTIVE", lastOpenedAt: null },
+  unsubscribed: { status: "UNSUBSCRIBED" },
+} satisfies Record<string, Prisma.SubscriberWhereInput>;
+
+export const dispatchRouter = router({
+  login: publicProcedure
+    .input(z.object({ email: z.string().trim(), password: z.string() }))
+    .mutation(({ ctx, input }) => {
+      const { email, password } = ctx.newsletter.admin;
+      if (!email || !password) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Dispatch sign-in is not configured" });
+      }
+      if (!loginLimit(ctx.ip ?? "unknown")) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many attempts" });
+      }
+      const ok =
+        safeEqual(input.email.toLowerCase(), email.toLowerCase()) && safeEqual(input.password, password);
+      if (!ok) throw new TRPCError({ code: "UNAUTHORIZED", message: "Wrong email or password" });
+      return {
+        token: adminToken(ctx.newsletter.secret, email, SESSION_TTL_MS),
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      };
+    }),
+
+  me: adminProcedure.query(({ ctx }) => ({
+    email: ctx.adminEmail,
+    canSend: ctx.newsletter.mailer.enabled,
+  })),
+
+  // N1 · Overview, conversion rate first.
+  overview: adminProcedure.query(async ({ ctx }) => {
+    const db = ctx.db;
+    const since = new Date(Date.now() - 30 * DAY_MS);
+    const [audience, active, converted, joined30, converted30, unsubscribed30, lastIssue, recentConverts] =
+      await Promise.all([
+        // Everyone still reading plus everyone who converted (even if they later left).
+        db.subscriber.count({ where: { OR: [{ status: "ACTIVE" }, { convertedAt: { not: null } }] } }),
+        db.subscriber.count({ where: { status: "ACTIVE" } }),
+        db.subscriber.count({ where: { convertedAt: { not: null } } }),
+        db.subscriber.count({ where: { subscribedAt: { gte: since } } }),
+        db.subscriber.count({ where: { convertedAt: { gte: since } } }),
+        db.subscriber.count({ where: { unsubscribedAt: { gte: since } } }),
+        db.issue.findFirst({ where: { kind: "BROADCAST", status: "SENT" }, orderBy: { sentAt: "desc" } }),
+        db.subscriber.findMany({
+          where: { convertedAt: { not: null } },
+          orderBy: { convertedAt: "desc" },
+          take: 5,
+          select: { email: true, subscribedAt: true, convertedAt: true },
+        }),
+      ]);
+    const stats = lastIssue ? (await issueStats(db, [lastIssue.id])).get(lastIssue.id) : undefined;
+    return {
+      activeSubscribers: active,
+      converted,
+      conversionRate: pct(converted, audience),
+      last30Days: { joined: joined30, converted: converted30, unsubscribed: unsubscribed30 },
+      lastIssue:
+        lastIssue && stats
+          ? {
+              id: lastIssue.id,
+              number: lastIssue.number,
+              subject: lastIssue.subject,
+              sentAt: lastIssue.sentAt,
+              openRate: pct(stats.opened, stats.sent),
+              clickRate: pct(stats.clicked, stats.sent),
+              signups: stats.signups,
+            }
+          : null,
+      recentConverts,
+    };
+  }),
+
+  // N6 · Subscribers.
+  subscribers: adminProcedure
+    .input(
+      z.object({
+        view: z.enum(["everyone", "users", "reading", "neverOpened", "unsubscribed"]).default("everyone"),
+        search: z.string().trim().max(254).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(14),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const where: Prisma.SubscriberWhereInput = {
+        ...subscriberViews[input.view],
+        ...(input.search ? { email: { contains: input.search.toLowerCase() } } : {}),
+      };
+      const [total, rows, viewCounts] = await Promise.all([
+        ctx.db.subscriber.count({ where }),
+        ctx.db.subscriber.findMany({
+          where,
+          orderBy: { subscribedAt: "desc" },
+          skip: (input.page - 1) * input.pageSize,
+          take: input.pageSize,
+        }),
+        Promise.all(
+          Object.entries(subscriberViews).map(
+            async ([view, w]) => [view, await ctx.db.subscriber.count({ where: w })] as const,
+          ),
+        ),
+      ]);
+      const ids = rows.map((r) => r.id);
+      const [sent, opened] = await Promise.all([
+        ctx.db.delivery.groupBy({ by: ["subscriberId"], where: { subscriberId: { in: ids }, status: "SENT" }, _count: true }),
+        ctx.db.delivery.groupBy({ by: ["subscriberId"], where: { subscriberId: { in: ids }, openedAt: { not: null } }, _count: true }),
+      ]);
+      const countFor = (list: { subscriberId: string; _count: number }[], id: string) =>
+        list.find((r) => r.subscriberId === id)?._count ?? 0;
+      return {
+        total,
+        page: input.page,
+        pageSize: input.pageSize,
+        views: Object.fromEntries(viewCounts),
+        rows: rows.map((r) => ({
+          ...r,
+          issuesSent: countFor(sent, r.id),
+          issuesOpened: countFor(opened, r.id),
+          tag: r.convertedAt ? "USER" : r.status !== "ACTIVE" ? r.status : r.lastOpenedAt ? "READING" : "COLD",
+        })),
+      };
+    }),
+
+  // N2 · Issues, welcome pinned above the broadcasts.
+  issues: adminProcedure.query(async ({ ctx }) => {
+    const welcome = await ensureWelcomeIssue(ctx.db);
+    const broadcasts = await ctx.db.issue.findMany({
+      where: { kind: "BROADCAST" },
+      orderBy: [{ number: { sort: "desc", nulls: "first" } }, { updatedAt: "desc" }],
+    });
+    const stats = await issueStats(ctx.db, [welcome.id, ...broadcasts.map((b) => b.id)]);
+    const withStats = <T extends { id: string }>(issue: T) => {
+      const s = stats.get(issue.id)!;
+      return { ...issue, ...s, openRate: pct(s.opened, s.sent), conversionRate: pct(s.signups, s.sent) };
+    };
+    return { welcome: withStats(welcome), broadcasts: broadcasts.map(withStats) };
+  }),
+
+  issue: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const issue = await ctx.db.issue.findUnique({ where: { id: input.id } });
+    if (!issue) throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
+    return issue;
+  }),
+
+  // N3 · Editor. Drafts and the welcome email are editable; sent broadcasts are not.
+  saveIssue: adminProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        subject: z.string().trim().min(1).max(200),
+        previewText: z.string().trim().max(200).nullish(),
+        body: z.string().max(100_000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      if (!id) return ctx.db.issue.create({ data: { ...data, kind: "BROADCAST", status: "DRAFT" } });
+      const issue = await ctx.db.issue.findUnique({ where: { id } });
+      if (!issue) throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
+      if (issue.kind === "BROADCAST" && issue.status !== "DRAFT") {
+        throw new TRPCError({ code: "CONFLICT", message: "Only drafts can be edited" });
+      }
+      return ctx.db.issue.update({ where: { id }, data });
+    }),
+
+  deleteDraft: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    const { count } = await ctx.db.issue.deleteMany({
+      where: { id: input.id, kind: "BROADCAST", status: "DRAFT" },
+    });
+    if (count === 0) throw new TRPCError({ code: "NOT_FOUND", message: "No such draft" });
+    return { ok: true };
+  }),
+
+  // N3/N4 · "Send a test", to the admin unless another address is given.
+  sendTest: adminProcedure
+    .input(z.object({ id: z.string(), to: z.string().email().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.newsletter.mailer.enabled) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SMTP is not configured" });
+      }
+      const to = input.to ?? ctx.adminEmail;
+      await sendTestIssue(ctx.db, ctx.newsletter, input.id, to);
+      return { to };
+    }),
+
+  // N9 · Settings.
+  settings: adminProcedure.query(({ ctx }) => getSettings(ctx.db)),
+
+  saveSettings: adminProcedure
+    .input(
+      z.object({
+        fromName: z.string().trim().min(1).max(100),
+        fromAddress: z.string().trim().email().nullish(),
+        replyTo: z.string().trim().email().nullish(),
+        usualSlotDay: z.number().int().min(0).max(6),
+        usualSlotTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+        footer: z
+          .string()
+          .max(2000)
+          .refine((s) => /\{\{\s*unsubscribe_url\s*\}\}/.test(s), "The footer must include {{ unsubscribe_url }}"),
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      ctx.db.newsletterSettings.upsert({ where: { id: "default" }, create: input, update: input }),
+    ),
+});

@@ -1,5 +1,6 @@
 import { expo } from "@better-auth/expo";
 import type { Database } from "@theinnerwar.app/db";
+import { linkSubscriberToUser } from "@theinnerwar.app/db/newsletter";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 
@@ -36,6 +37,20 @@ export function createAuth(
       },
     },
     plugins: [expo()],
+    databaseHooks: {
+      user: {
+        create: {
+          // Newsletter conversion: a reader who became a user (Dispatch N7).
+          after: async (user) => {
+            try {
+              await linkSubscriberToUser(database, user);
+            } catch (error) {
+              console.error("[newsletter] failed to link subscriber to user", error);
+            }
+          },
+        },
+      },
+    },
   });
 }
 
