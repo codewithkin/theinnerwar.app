@@ -13,7 +13,13 @@ import {
 } from "../newsletter/broadcast";
 import { createRateLimiter } from "../newsletter/rate-limit";
 import { renderEmail } from "../newsletter/render";
-import { conversionRateAt, growthSeries, issueCsv, issueReport } from "../newsletter/reports";
+import {
+  conversionRateAt,
+  conversionReport,
+  growthSeries,
+  issueCsv,
+  issueReport,
+} from "../newsletter/reports";
 import { ensureWelcomeIssue, getSettings, issueLabel, sendTestIssue } from "../newsletter/service";
 import { adminToken, safeEqual, verifyAdminToken } from "../newsletter/tokens";
 
@@ -179,6 +185,11 @@ export const dispatchRouter = router({
       nextOut: nextOut && { id: nextOut.id, subject: nextOut.subject, status: nextOut.status, scheduledFor: nextOut.scheduledFor },
     };
   }),
+
+  // N7 · Conversions.
+  conversions: adminProcedure
+    .input(z.object({ range: z.enum(["all", "quarter", "month"]).default("all") }))
+    .query(({ ctx, input }) => conversionReport(ctx.db, input.range)),
 
   // N5 · Issue report.
   report: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {

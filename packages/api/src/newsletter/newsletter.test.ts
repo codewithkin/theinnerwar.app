@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { analyzeBody, subjectVerdict } from "./analyze";
 import { createRateLimiter } from "./rate-limit";
+import { median, rangeStart, toCsv } from "./reports";
 import { renderEmail, toPlainText } from "./render";
 import {
   adminToken,
@@ -100,5 +101,21 @@ describe("analyzeBody", () => {
     expect(analyzeBody("Just words.", "https://innerwar.app").pitchPresent).toBe(false);
     expect(subjectVerdict("The hour you avoid")).toBe("GOOD");
     expect(subjectVerdict("x".repeat(60))).toBe("LONG");
+  });
+});
+
+describe("reports helpers", () => {
+  test("median and ranges", () => {
+    expect(median([])).toBeNull();
+    expect(median([5, 1, 3])).toBe(3);
+    expect(median([1, 2, 3, 4])).toBe(2.5);
+    const now = new Date(2026, 8, 19);
+    expect(rangeStart("month", now)).toEqual(new Date(2026, 8, 1));
+    expect(rangeStart("quarter", now)).toEqual(new Date(2026, 6, 1));
+    expect(rangeStart("all", now)).toBeNull();
+  });
+
+  test("csv escaping", () => {
+    expect(toCsv(["a", "b"], [["x,y", 'say "hi"']])).toBe('a,b\r\n"x,y","say ""hi"""\r\n');
   });
 });
