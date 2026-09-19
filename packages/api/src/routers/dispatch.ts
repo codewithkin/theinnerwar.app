@@ -270,14 +270,16 @@ export const dispatchRouter = router({
     .query(async ({ ctx, input }) => {
       const saved = input.id ? await ctx.db.issue.findUnique({ where: { id: input.id } }) : null;
       const settings = await getSettings(ctx.db);
-      return renderEmail({
+      const body = input.body ?? saved?.body ?? "";
+      const rendered = renderEmail({
         label: issueLabel(saved ?? { kind: "BROADCAST", number: null }),
         subject: input.subject ?? saved?.subject ?? "",
         previewText: input.previewText ?? saved?.previewText,
-        body: input.body ?? saved?.body ?? "",
+        body,
         footer: settings.footer,
         unsubscribeUrl: `${ctx.newsletter.webUrl}/unsubscribe`,
       });
+      return { ...rendered, analysis: analyzeBody(body, ctx.newsletter.webUrl) };
     }),
 
   // N6 · Subscribers.
