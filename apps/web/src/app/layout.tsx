@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   title: "The Inner War",
   description:
     "Principles from books you already respect, turned into one lesson, one mission and one line of evidence a day.",
+  // <meta name="apple-mobile-web-app-title" content="Inner War" />
+  appleWebApp: { title: "Inner War" },
 };
 
 export const viewport: Viewport = {
