@@ -76,8 +76,8 @@ export default function SettingsPage() {
     { k: "From name", hint: "Shown in the inbox", field: <input className={input} value={form.fromName} onChange={(e) => set("fromName", e.target.value)} /> },
     {
       k: "From address",
-      hint: "Blank uses MAIL_FROM on the server",
-      field: <input className={input} type="email" placeholder="letters@innerwar.app" value={form.fromAddress} onChange={(e) => set("fromAddress", e.target.value)} />,
+      hint: "Blank uses NEWSLETTER_MAIL_FROM on the server",
+      field: <input className={input} type="email" placeholder="newsletter@theinnerwar.app" value={form.fromAddress} onChange={(e) => set("fromAddress", e.target.value)} />,
     },
     { k: "Reply-to", hint: "Replies come here", field: <input className={input} type="email" placeholder="hello@innerwar.app" value={form.replyTo} onChange={(e) => set("replyTo", e.target.value)} /> },
     {
