@@ -2,11 +2,15 @@ import nodemailer from "nodemailer";
 
 import { createLogger } from "./log";
 
-const log = createLogger("newsletter.smtp");
-
-// Manual SMTP through nodemailer; every value comes from the server env.
+// SMTP through nodemailer; every value comes from the server env. The server
+// runs two of these: `noreply` (account mail) and `newsletter` (the letters),
+// each signed in as its own mailbox.
 
 export type SmtpConfig = {
+  /** Names the mailbox in logs and errors, e.g. "newsletter" or "noreply". */
+  label: string;
+  /** Env var prefix, for error messages, e.g. "NEWSLETTER_". */
+  envPrefix: string;
   host?: string;
   port?: number;
   secure?: boolean;
@@ -27,7 +31,8 @@ export type OutgoingMail = {
 };
 
 export type Mailer = {
-  /** False when SMTP_HOST is not configured; sends are then skipped. */
+  label: string;
+  /** False unless host, user and password are all set; sends are then skipped. */
   enabled: boolean;
   defaultFrom?: string;
   defaultReplyTo?: string;
@@ -35,40 +40,49 @@ export type Mailer = {
 };
 
 export function createMailer(config: SmtpConfig): Mailer {
-  if (!config.host) {
-    log.warn("SMTP_HOST not set: mail is disabled, subscribers are still recorded");
+  const log = createLogger(`mail.${config.label}`);
+  const p = config.envPrefix;
+  const missing = [
+    !config.host && `${p}SMTP_HOST`,
+    !config.user && `${p}SMTP_USER`,
+    !config.password && `${p}SMTP_PASSWORD`,
+  ].filter(Boolean);
+
+  if (missing.length) {
+    log.warn("mailbox not configured: sending disabled", { missing });
     return {
+      label: config.label,
       enabled: false,
+      defaultFrom: config.from,
+      defaultReplyTo: config.replyTo,
       async send() {
-        throw new Error("SMTP is not configured (set SMTP_HOST and friends in the server env)");
+        throw new Error(`The ${config.label} mailbox is not configured (set ${missing.join(", ")})`);
       },
     };
   }
 
-  log.info("SMTP configured", {
-    host: config.host,
-    port: config.port ?? 587,
-    secure: config.secure ?? false,
-    user: config.user,
-    from: config.from,
-  });
+  const port = config.port ?? 465;
+  const secure = config.secure ?? port === 465;
+  log.info("mailbox configured", { host: config.host, port, secure, user: config.user, from: config.from });
   const transport = nodemailer.createTransport({
     host: config.host,
-    port: config.port ?? 587,
-    secure: config.secure ?? false,
-    auth: config.user ? { user: config.user, pass: config.password ?? "" } : undefined,
+    port,
+    secure,
+    auth: { user: config.user!, pass: config.password! },
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
   });
 
   return {
+    label: config.label,
     enabled: true,
     defaultFrom: config.from,
     defaultReplyTo: config.replyTo,
     async send(mail) {
+      // Mailbox providers reject a From that isn't the signed-in mailbox, so the
+      // login address is the fallback sender.
       const from = mail.from ?? config.from ?? config.user;
-      if (!from) throw new Error("No sender address: set MAIL_FROM");
       const started = Date.now();
       const info = await transport.sendMail({
         from,
