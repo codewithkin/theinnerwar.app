@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   title: { default: "Dispatch", template: "%s · Dispatch" },
   description: "The Inner War newsletter, internal.",
   robots: { index: false, follow: false },
+  // <meta name="apple-mobile-web-app-title" content="Dispatch" />
+  appleWebApp: { title: "Dispatch" },
 };
 
 export const viewport: Viewport = { themeColor: "#131110" };
