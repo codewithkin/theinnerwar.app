@@ -19,6 +19,7 @@ import {
   conversionRateAt,
   conversionReport,
   growthSeries,
+  toCsv,
   issueCsv,
   issueReport,
 } from "../newsletter/reports";
@@ -329,6 +330,63 @@ export const dispatchRouter = router({
       };
     }),
 
+  // N6 · "Export": every subscriber in the current view, as CSV.
+  exportSubscribers: adminProcedure
+    .input(z.object({ view: z.enum(["everyone", "users", "reading", "neverOpened", "unsubscribed"]).default("everyone") }))
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db.subscriber.findMany({ where: subscriberViews[input.view], orderBy: { subscribedAt: "asc" } });
+      log.info("subscribers exported", { view: input.view, rows: rows.length });
+      return toCsv(
+        ["email", "status", "subscribed_at", "source", "utm_source", "utm_campaign", "last_opened_at", "converted_at", "unsubscribed_at"],
+        rows.map((r) => [r.email, r.status, r.subscribedAt, r.source, r.utmSource, r.utmCampaign, r.lastOpenedAt, r.convertedAt, r.unsubscribedAt]),
+      );
+    }),
+
+  // N6 · "Import CSV": emails from the first column (or an "email" column).
+  // Suppressed and already-known addresses are skipped; no welcome email is sent.
+  importSubscribers: adminProcedure
+    .input(z.object({ csv: z.string().max(5_000_000), source: z.string().max(60).default("import") }))
+    .mutation(async ({ ctx, input }) => {
+      const lines = input.csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const header = lines[0]?.toLowerCase().split(",").map((h) => h.replace(/"/g, "").trim()) ?? [];
+      const col = Math.max(0, header.indexOf("email"));
+      const body = header.includes("email") ? lines.slice(1) : lines;
+      const emails = [...new Set(
+        body
+          .map((l) => (l.split(",")[col] ?? "").replace(/"/g, "").trim().toLowerCase())
+          .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)),
+      )];
+      const [known, suppressed] = await Promise.all([
+        ctx.db.subscriber.findMany({ where: { email: { in: emails } }, select: { email: true } }),
+        ctx.db.suppression.findMany({ where: { email: { in: emails } }, select: { email: true } }),
+      ]);
+      const skip = new Set([...known, ...suppressed].map((r) => r.email));
+      const fresh = emails.filter((e) => !skip.has(e));
+      const created = await ctx.db.subscriber.createMany({
+        data: fresh.map((email) => ({ email, source: input.source })),
+        skipDuplicates: true,
+      });
+      const result = {
+        rows: body.length,
+        valid: emails.length,
+        imported: created.count,
+        alreadySubscribed: known.length,
+        suppressed: suppressed.length,
+        invalid: body.length - emails.length,
+      };
+      log.info("subscribers imported", result);
+      return result;
+    }),
+
+  removeSubscriber: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    const sub = await ctx.db.subscriber.update({
+      where: { id: input.id },
+      data: { status: "UNSUBSCRIBED", unsubscribedAt: new Date(), unsubscribeReason: "removed by admin" },
+    });
+    log.info("subscriber removed by admin", { subscriberId: sub.id, email: redactEmail(sub.email) });
+    return { ok: true };
+  }),
+
   // N2 · Issues, welcome pinned above the broadcasts.
   issues: adminProcedure.query(async ({ ctx }) => {
     const welcome = await ensureWelcomeIssue(ctx.db);
@@ -458,13 +516,39 @@ export const dispatchRouter = router({
         replyTo: z.string().trim().email().nullish(),
         usualSlotDay: z.number().int().min(0).max(6),
         usualSlotTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+        dkimSelector: z.string().trim().max(63).nullish(),
         footer: z
           .string()
           .max(2000)
           .refine((s) => /\{\{\s*unsubscribe_url\s*\}\}/.test(s), "The footer must include {{ unsubscribe_url }}"),
       }),
     )
-    .mutation(({ ctx, input }) =>
-      ctx.db.newsletterSettings.upsert({ where: { id: "default" }, create: input, update: input }),
-    ),
+    .mutation(async ({ ctx, input }) => {
+      const saved = await ctx.db.newsletterSettings.upsert({ where: { id: "default" }, create: input, update: input });
+      log.info("settings saved", { fromName: saved.fromName, fromAddress: saved.fromAddress, dkimSelector: saved.dkimSelector });
+      return saved;
+    }),
+
+  // N9 · "Send myself a test": the welcome email with the current settings.
+  sendSettingsTest: adminProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.newsletter.mailer.enabled) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "SMTP is not configured" });
+    }
+    const welcome = await ensureWelcomeIssue(ctx.db);
+    log.info("settings test send", { to: redactEmail(ctx.adminEmail) });
+    await sendTestIssue(ctx.db, ctx.newsletter, welcome.id, ctx.adminEmail);
+    return { to: ctx.adminEmail };
+  }),
+
+  /** Live preview of the footer (N9 "As the reader sees it"). */
+  previewFooter: adminProcedure.input(z.object({ footer: z.string().max(2000) })).query(({ ctx, input }) => {
+    const { html } = renderEmail({
+      label: "THE INNER WAR",
+      subject: "",
+      body: "",
+      footer: input.footer,
+      unsubscribeUrl: `${ctx.newsletter.webUrl}/unsubscribe`,
+    });
+    return html;
+  }),
 });
