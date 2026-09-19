@@ -40,5 +40,11 @@
         "service": "web"
       }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/n/cron",
+      "schedule": "* * * * *"
+    }
   ]
 }

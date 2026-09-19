@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(node C:\\Users\\kinzi\\AppData\\Local\\Temp\\commandcode\\C--Users-kinzi-Desktop-projects-theinnerwar-app\\51f30fca-1579-4152-bb99-8711a5c89936\\scratchpad\\decode.mjs)",
+      "powershell"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

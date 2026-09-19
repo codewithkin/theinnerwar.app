@@ -11,3 +11,4 @@ export function createPrismaClient(env: DatabaseConfig) {
 }
 
 export type Database = ReturnType<typeof createPrismaClient>;
+export type { Prisma } from "../prisma/generated/client";

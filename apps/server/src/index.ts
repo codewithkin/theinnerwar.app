@@ -6,6 +6,7 @@ import { logger } from "hono/logger";
 
 import { createContext } from "./context";
 import { ENV } from "./env.server";
+import { newsletterRoutes, startNewsletterRunner } from "./newsletter-routes";
 import { auth } from "./services";
 
 const app = new Hono();
@@ -14,7 +15,8 @@ app.use(logger());
 app.use(
   "/*",
   cors({
-    origin: ENV.CORS_ORIGIN,
+    // The website, plus Dispatch (the internal newsletter app) when configured.
+    origin: [ENV.CORS_ORIGIN, ...(ENV.DISPATCH_ORIGIN ? [ENV.DISPATCH_ORIGIN] : [])],
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -22,6 +24,8 @@ app.use(
 );
 
 app.on(["POST", "GET"], "/api/auth/*", async (c) => auth.handler(c.req.raw));
+
+app.route("/n", newsletterRoutes);
 
 app.use(
   "/trpc/*",
@@ -36,5 +40,7 @@ app.use(
 app.get("/", (c) => {
   return c.text("OK");
 });
+
+if (ENV.NEWSLETTER_RUNNER) startNewsletterRunner();
 
 export default app;

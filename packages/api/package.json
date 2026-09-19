@@ -6,17 +6,21 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@theinnerwar.app/auth": "workspace:*",
     "@theinnerwar.app/db": "workspace:*",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
+    "marked": "^18.0.13",
+    "nodemailer": "^10.0.10",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@theinnerwar.app/config": "workspace:*",
+    "@types/nodemailer": "^8.0.2",
     "typescript": "^6.0.3"
   }
 }

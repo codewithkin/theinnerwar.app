@@ -1,0 +1,33 @@
+// Access: what a person has paid for. Provider-agnostic; no payment provider
+// is wired yet, so rows are written only once checkout exists.
+
+enum Plan {
+  MONTHLY
+  LIFETIME
+}
+
+enum EntitlementStatus {
+  TRIALING
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+model Entitlement {
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan             Plan
+  status           EntitlementStatus
+  trialEndsAt      DateTime?
+  // Null for lifetime.
+  currentPeriodEnd DateTime?
+  provider         String?
+  providerRef      String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([userId])
+  @@map("entitlement")
+}

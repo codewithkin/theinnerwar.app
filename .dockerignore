@@ -1,0 +1,43 @@
+# Dependencies & build output
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+.expo
+**/.expo
+packages/db/prisma/generated
+
+# VCS / editor / local tooling
+.git
+.gitignore
+.vscode
+.idea
+.claude
+.commandcode
+designs
+
+# Env files: never bake secrets into an image layer. .env.schema is kept
+# because Varlock validates the environment against it at build and start.
+.env
+.env.*
+!.env.example
+!.env.schema
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.schema
+
+# Expo/React Native has no Docker target; only its env schema is needed
+# (the root postinstall runs Varlock codegen for every app).
+apps/native/*
+!apps/native/.env.schema
+!apps/native/package.json
+
+# Logs / OS noise
+*.log
+.DS_Store
+PROGRESS.md

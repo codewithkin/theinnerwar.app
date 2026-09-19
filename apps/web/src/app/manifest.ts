@@ -2,13 +2,13 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "theinnerwar.app",
-    short_name: "theinnerwar.app",
-    description: "my pwa app",
+    name: "The Inner War",
+    short_name: "The Inner War",
+    description: "One lesson, one mission and one line of evidence a day.",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#000000",
+    background_color: "#131110",
+    theme_color: "#131110",
     icons: [
       {
         src: "/favicon/web-app-manifest-192x192.png",
