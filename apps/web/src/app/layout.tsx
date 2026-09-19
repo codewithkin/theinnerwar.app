@@ -1,24 +1,37 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Archivo, JetBrains_Mono, Newsreader } from "next/font/google";
 
 import "../index.css";
-import Header from "@/components/header";
 import Providers from "@/components/providers";
 import PwaRegistration from "@/components/pwa-registration";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
   subsets: ["latin"],
+  weight: ["300", "400"],
+  style: ["normal", "italic"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
-  title: "theinnerwar.app",
-  description: "theinnerwar.app",
+  title: "The Inner War",
+  description:
+    "Principles from books you already respect, turned into one lesson, one mission and one line of evidence a day.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#131110",
 };
 
 export default function RootLayout({
@@ -28,15 +41,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${archivo.variable} ${newsreader.variable} ${jetbrainsMono.variable} antialiased`}
+      >
         <PwaRegistration />
-
-        <Providers>
-          <div className="grid grid-rows-[auto_1fr] h-svh">
-            <Header />
-            {children}
-          </div>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
