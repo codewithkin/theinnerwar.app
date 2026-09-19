@@ -1,7 +1,10 @@
 import type { Database } from "@theinnerwar.app/db";
 
 import type { NewsletterContext } from "./context";
+import { createLogger } from "./log";
 import { sendDelivery } from "./service";
+
+const log = createLogger("newsletter.broadcast");
 
 // Broadcasts (Dispatch N4): an issue is scheduled or sent now, which queues one
 // delivery per active, non-suppressed subscriber; a runner then sends the queue
@@ -47,10 +50,12 @@ export async function scheduleIssue(db: Database, id: string, at: Date, now = ne
   if (at.getTime() < now.getTime() + CANCEL_CUTOFF_MS) {
     throw new BroadcastError("Pick a time at least a minute from now, or send immediately");
   }
-  return db.issue.update({
+  const updated = await db.issue.update({
     where: { id },
     data: { status: "SCHEDULED", scheduledFor: at, number: issue.number ?? (await nextNumber(db)) },
   });
+  log.info("scheduled", { issueId: id, number: updated.number, at });
+  return updated;
 }
 
 export async function cancelSchedule(db: Database, id: string, now = new Date()) {
@@ -59,6 +64,7 @@ export async function cancelSchedule(db: Database, id: string, now = new Date())
   if (issue.scheduledFor.getTime() - now.getTime() < CANCEL_CUTOFF_MS) {
     throw new BroadcastError("Too late to stop: it goes in under a minute");
   }
+  log.info("schedule cancelled", { issueId: id, wasFor: issue.scheduledFor });
   return db.issue.update({ where: { id }, data: { status: "DRAFT", scheduledFor: null } });
 }
 
@@ -73,7 +79,10 @@ export async function startSend(db: Database, id: string, now = new Date()) {
     where: { id, status: issue.status },
     data: { status: "SENDING", sentAt: now, number: issue.number ?? (await nextNumber(db)) },
   });
-  if (claimed.count === 0) return db.issue.findUniqueOrThrow({ where: { id } });
+  if (claimed.count === 0) {
+    log.warn("send start lost race: already claimed", { issueId: id });
+    return db.issue.findUniqueOrThrow({ where: { id } });
+  }
 
   const [subscribers, suppressed] = await Promise.all([
     db.subscriber.findMany({ where: audienceWhere(), select: { id: true, email: true } }),
@@ -88,6 +97,11 @@ export async function startSend(db: Database, id: string, now = new Date()) {
       skipDuplicates: true,
     });
   }
+  log.info("send started", {
+    issueId: id,
+    recipients: recipients.length,
+    skippedSuppressed: subscribers.length - recipients.length,
+  });
   return db.issue.update({ where: { id }, data: { recipientCount: recipients.length } });
 }
 
@@ -106,14 +120,18 @@ export async function processQueue(
   });
   for (const issue of due) await startSend(db, issue.id, now);
 
+  if (due.length) log.info("due scheduled issues started", { count: due.length });
+
   // Return abandoned claims to the queue.
-  await db.delivery.updateMany({
+  const reclaimed = await db.delivery.updateMany({
     where: { status: "SENDING", claimedAt: { lt: new Date(now.getTime() - STALE_CLAIM_MS) } },
     data: { status: "QUEUED", claimedAt: null },
   });
+  if (reclaimed.count) log.warn("reclaimed stale deliveries", { count: reclaimed.count });
 
   let sent = 0;
   let failed = 0;
+  if (!nl.mailer.enabled) log.debug("queue tick skipped sending: SMTP not configured");
   if (nl.mailer.enabled) {
     const queued = await db.delivery.findMany({
       where: { status: "QUEUED", issue: { status: "SENDING" } },
@@ -140,8 +158,12 @@ export async function processQueue(
     });
     if (left === 0) {
       await db.issue.update({ where: { id: issue.id }, data: { status: "SENT" } });
+      log.info("send finished", { issueId: issue.id });
       finished++;
     }
   }
-  return { started: due.length, sent, failed, finished };
+  const result = { started: due.length, sent, failed, finished };
+  if (sent || failed || finished || due.length) log.info("queue tick", result);
+  else log.debug("queue tick idle");
+  return result;
 }

@@ -1,5 +1,9 @@
 import nodemailer from "nodemailer";
 
+import { createLogger } from "./log";
+
+const log = createLogger("newsletter.smtp");
+
 // Manual SMTP through nodemailer; every value comes from the server env.
 
 export type SmtpConfig = {
@@ -32,6 +36,7 @@ export type Mailer = {
 
 export function createMailer(config: SmtpConfig): Mailer {
   if (!config.host) {
+    log.warn("SMTP_HOST not set: mail is disabled, subscribers are still recorded");
     return {
       enabled: false,
       async send() {
@@ -40,6 +45,13 @@ export function createMailer(config: SmtpConfig): Mailer {
     };
   }
 
+  log.info("SMTP configured", {
+    host: config.host,
+    port: config.port ?? 587,
+    secure: config.secure ?? false,
+    user: config.user,
+    from: config.from,
+  });
   const transport = nodemailer.createTransport({
     host: config.host,
     port: config.port ?? 587,
@@ -57,6 +69,7 @@ export function createMailer(config: SmtpConfig): Mailer {
     async send(mail) {
       const from = mail.from ?? config.from ?? config.user;
       if (!from) throw new Error("No sender address: set MAIL_FROM");
+      const started = Date.now();
       const info = await transport.sendMail({
         from,
         replyTo: mail.replyTo ?? config.replyTo,
@@ -65,6 +78,13 @@ export function createMailer(config: SmtpConfig): Mailer {
         html: mail.html,
         text: mail.text,
         headers: mail.headers,
+      });
+      log.debug("smtp accepted", {
+        messageId: info.messageId,
+        ms: Date.now() - started,
+        accepted: info.accepted?.length,
+        rejected: info.rejected?.length,
+        response: info.response,
       });
       return { messageId: info.messageId };
     },
