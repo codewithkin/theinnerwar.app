@@ -1,10 +1,12 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import { PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
 
 import { trpc } from "@/lib/trpc";
 
+import { Icon } from "./icon";
 import { Button } from "./kit";
 
 const STARTER = `# Untitled issue
@@ -33,7 +35,7 @@ export function WriteIssueButton() {
   );
   return (
     <Button variant="ember" pending={create.isPending} onClick={() => create.mutate({ subject: "Untitled issue", body: STARTER })}>
-      <span className="text-[15px] leading-none">+</span> Write an issue
+      <Icon icon={PencilEdit02Icon} size={15} /> Write an issue
     </Button>
   );
 }

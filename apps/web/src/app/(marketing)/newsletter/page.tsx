@@ -1,9 +1,11 @@
+import { Calendar03Icon, Coins01Icon, QuoteDownIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Wordmark } from "@theinnerwar.app/ui/components/ember-mark";
 import { Eyebrow } from "@theinnerwar.app/ui/components/eyebrow";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
+import { Icon } from "@/components/icon";
 import { NewsletterForm } from "@/components/newsletter/newsletter-form";
 
 const description =
@@ -22,9 +24,9 @@ export const metadata: Metadata = {
 };
 
 const facts = [
-  { v: "Sunday", k: "ONE LETTER A WEEK" },
-  { v: "Free", k: "TO JOIN" },
-  { v: "1 click", k: "TO LEAVE" },
+  { v: "Sunday", k: "ONE LETTER A WEEK", icon: Calendar03Icon },
+  { v: "Free", k: "TO JOIN", icon: Coins01Icon },
+  { v: "1 click", k: "TO LEAVE", icon: Tick02Icon },
 ] as const;
 
 // /newsletter: the link in every social bio. One job: join the letters.
@@ -78,13 +80,17 @@ export default function NewsletterPage() {
           <dl className="mt-2 flex gap-7 sm:gap-11">
             {facts.map((f) => (
               <div key={f.k} className="flex flex-col-reverse gap-[3px]">
-                <dt className="font-mono text-[9px] tracking-[0.16em] text-stone">{f.k}</dt>
+                <dt className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.16em] text-stone">
+                  <Icon icon={f.icon} size={12} className="text-ember-glow/70" />
+                  {f.k}
+                </dt>
                 <dd className="font-serif text-[26px] leading-none text-cream sm:text-[30px]">{f.v}</dd>
               </div>
             ))}
           </dl>
 
-          <figure className="mt-4 border-l-2 border-ember pl-5">
+          <figure className="relative mt-4 border-l-2 border-ember pl-5">
+            <Icon icon={QuoteDownIcon} size={16} className="absolute -top-1 left-5 text-ember/70" />
             <blockquote className="font-serif text-xl leading-[1.45] text-cream italic text-pretty sm:text-[22px]">
               You do not have to finish the task now. You only have to make the beginning undeniable.
             </blockquote>

@@ -4,6 +4,13 @@ import { Ledger } from "@theinnerwar.app/ui/components/ledger";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
+import {
+  ArrowRight01Icon,
+  HelpCircleIcon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
+
+import { Icon } from "@/components/icon";
 import { NewsletterForm } from "@/components/newsletter/newsletter-form";
 
 import {
@@ -117,7 +124,10 @@ export function Gap() {
               key={a.k}
               className="flex items-baseline justify-between gap-3 border-b border-white/8 pb-3"
             >
-              <span className="text-sm text-parchment">{a.k}</span>
+              <span className="flex items-center gap-2 text-sm text-parchment">
+                <Icon icon={a.icon} size={14} className="text-ember-glow/70" />
+                {a.k}
+              </span>
               <span className="font-serif text-[22px] text-cream">{a.v}</span>
             </div>
           ))}
@@ -168,10 +178,12 @@ export function DailyLoop() {
             <span className="font-mono text-[10px] tracking-[0.18em] text-stone">{l.meta}</span>
             <span
               className={cn(
-                "relative size-[13px] rounded-full border border-ember-light/50",
-                idx === 0 ? "bg-ember" : "bg-[#3a332c]",
+                "relative flex size-8 items-center justify-center rounded-full border border-ember-light/50",
+                idx === 0 ? "bg-ember text-[#1a1613]" : "bg-[#3a332c] text-ember-glow",
               )}
-            />
+            >
+              <Icon icon={l.icon} size={16} />
+            </span>
             <span
               className={cn(
                 "font-serif text-[52px] leading-[0.9] font-light",
@@ -247,7 +259,7 @@ export function PathsIndex() {
             >
               {p.meta}
             </span>
-            <span className="hidden size-2 flex-none rotate-45 border-t-[1.6px] border-r-[1.6px] border-stone-muted lg:block" />
+            <Icon icon={ArrowRight01Icon} size={16} className="hidden text-stone-muted lg:block" />
             {pathDetails.some((d) => d.slug === p.slug) ? (
               <Link
                 href={`/paths/${p.slug}`}
@@ -319,8 +331,9 @@ export function Pricing() {
               {p.rows.map((r) => (
                 <li
                   key={r}
-                  className="border-t border-hairline py-3 text-sm leading-normal text-parchment text-pretty"
+                  className="flex items-start gap-2.5 border-t border-hairline py-3 text-sm leading-normal text-parchment text-pretty"
                 >
+                  <Icon icon={Tick02Icon} size={14} className="mt-0.5 text-ember-glow" />
                   {r}
                 </li>
               ))}
@@ -357,7 +370,8 @@ export function Faq() {
             key={q.q}
             className="flex flex-col gap-3 border-b border-hairline py-6 md:flex-row md:items-start md:gap-[26px]"
           >
-            <dt className="min-w-0 flex-1 font-serif text-[22px] leading-[1.25] text-cream text-pretty">
+            <dt className="flex min-w-0 flex-1 items-start gap-3 font-serif text-[22px] leading-[1.25] text-cream text-pretty">
+              <Icon icon={HelpCircleIcon} size={18} className="mt-1.5 text-ember-glow/80" />
               {q.q}
             </dt>
             <dd className="min-w-0 flex-1 text-[15px] leading-[1.6] text-stone-muted text-pretty">
@@ -441,10 +455,12 @@ export function Footer() {
         <div className="flex gap-2.5">
           {social.map((s) => (
             <span
-              key={s}
-              className="flex size-[34px] items-center justify-center rounded-full border border-white/16 font-mono text-[11px] text-stone-muted"
+              key={s.label}
+              title={s.label}
+              className="flex size-[34px] items-center justify-center rounded-full border border-white/16 text-stone-muted"
             >
-              {s}
+              <Icon icon={s.icon} size={15} />
+              <span className="sr-only">{s.label}</span>
             </span>
           ))}
         </div>

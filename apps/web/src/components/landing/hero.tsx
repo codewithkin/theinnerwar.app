@@ -6,7 +6,10 @@ import { cn } from "@theinnerwar.app/ui/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 
+import { Icon } from "@/components/icon";
 import { NewsletterForm } from "@/components/newsletter/newsletter-form";
+
+import { QuoteDownIcon, Target01Icon } from "@hugeicons/core-free-icons";
 
 import { heroStats, letterNote, nav, sampleLedger } from "./content";
 
@@ -25,7 +28,7 @@ export function Nav() {
               href={n.href}
               className="flex items-baseline gap-1.5 no-underline hover:text-ember-glow"
             >
-              <span className="font-mono text-[9px] text-slate">{n.i}</span>
+              <Icon icon={n.icon} size={14} className={idx === 0 ? "text-ember-glow" : "text-stone"} />
               <span className={cn("text-sm", idx === 0 ? "text-bone" : "text-stone-muted")}>
                 {n.label}
               </span>
@@ -78,7 +81,10 @@ export function Hero() {
         <dl className="relative mt-auto flex gap-8 pt-[34px] sm:gap-11">
           {heroStats.map((s) => (
             <div key={s.k} className="flex flex-col-reverse gap-[3px]">
-              <dt className="font-mono text-[9px] tracking-[0.16em] text-stone">{s.k}</dt>
+              <dt className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.16em] text-stone">
+                <Icon icon={s.icon} size={12} className="text-ember-glow/70" />
+                {s.k}
+              </dt>
               <dd className="font-serif text-[30px] leading-none text-cream">{s.v}</dd>
             </div>
           ))}
@@ -144,7 +150,8 @@ export function ProductCard() {
             </div>
           </div>
           <div className="flex flex-col gap-[5px] rounded-[14px] border border-white/10 bg-white/5 p-[13px]">
-            <span className="font-mono text-[8px] tracking-[0.16em] text-ember-glow">
+            <span className="flex items-center gap-1.5 font-mono text-[8px] tracking-[0.16em] text-ember-glow">
+              <Icon icon={Target01Icon} size={11} />
               TODAY’S MISSION · 25 MIN
             </span>
             <span className="text-[13px] leading-[1.35] text-bone">
@@ -175,7 +182,8 @@ export function ProductCard() {
               </div>
             </div>
             <div className="flex flex-none flex-col justify-between gap-3 rounded-[18px] border border-white/10 bg-white/5 p-[18px] sm:w-[216px]">
-              <Eyebrow size="xs" tone="muted">
+              <Eyebrow size="xs" tone="muted" className="flex items-center gap-1.5">
+                <Icon icon={QuoteDownIcon} size={11} />
                 EVIDENCE
               </Eyebrow>
               <span className="font-serif text-base leading-[1.35] text-[#efe8dc] italic text-pretty">

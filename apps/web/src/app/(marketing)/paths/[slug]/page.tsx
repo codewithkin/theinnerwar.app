@@ -1,9 +1,11 @@
+import { BookOpen01Icon, Target01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Eyebrow } from "@theinnerwar.app/ui/components/eyebrow";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
+import { Icon } from "@/components/icon";
 import { Nav } from "@/components/landing/hero";
 import { letterNote, pathDetails } from "@/components/landing/content";
 import { Footer } from "@/components/landing/sections";
@@ -44,8 +46,9 @@ export default async function PathDetail({ params }: Props) {
             {path.facts.map((f) => (
               <li
                 key={f}
-                className="mr-[18px] border-r border-white/14 py-[9px] pr-[18px] font-mono text-[10px] tracking-[0.14em] text-stone-muted"
+                className="mr-[18px] flex items-center gap-2 border-r border-white/14 py-[9px] pr-[18px] font-mono text-[10px] tracking-[0.14em] text-stone-muted"
               >
+                <Icon icon={Tick02Icon} size={12} className="text-ember-glow/70" />
                 {f}
               </li>
             ))}
@@ -87,10 +90,11 @@ export default async function PathDetail({ params }: Props) {
           >
             <span
               className={cn(
-                "font-mono text-[9px] tracking-[0.16em]",
+                "flex items-center gap-2 font-mono text-[9px] tracking-[0.16em]",
                 idx === 0 ? "text-ember-glow" : "text-stone-muted",
               )}
             >
+              <Icon icon={BookOpen01Icon} size={12} />
               {c.tag}
             </span>
             <h2 className="font-serif text-[30px] leading-[1.06] tracking-[-0.02em] text-cream">
@@ -106,7 +110,10 @@ export default async function PathDetail({ params }: Props) {
         className="flex flex-col gap-8 px-4 pt-10 pb-12 sm:px-11 lg:flex-row lg:items-center lg:justify-between lg:gap-10"
       >
         <div className="flex min-w-0 flex-col gap-2">
-          <Eyebrow className="tracking-[0.18em]">SAMPLE LESSON · DAY 1</Eyebrow>
+          <Eyebrow className="flex items-center gap-2 tracking-[0.18em]">
+            <Icon icon={Target01Icon} size={12} />
+            SAMPLE LESSON · DAY 1
+          </Eyebrow>
           <p className="font-serif text-[28px] leading-[1.1] tracking-[-0.025em] text-paper text-pretty sm:text-[34px]">
             {path.sample}
           </p>

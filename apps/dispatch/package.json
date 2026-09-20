@@ -10,6 +10,8 @@
     "env:generate": "varlock codegen"
   },
   "dependencies": {
+    "@hugeicons/core-free-icons": "^4.3.4",
+    "@hugeicons/react": "^1.1.10",
     "@swc/helpers": "^0.5.23",
     "@tanstack/react-query": "catalog:",
     "@theinnerwar.app/api": "workspace:*",

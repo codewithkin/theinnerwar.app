@@ -3,10 +3,17 @@
 import { useMutation } from "@tanstack/react-query";
 import { EmberMark } from "@theinnerwar.app/ui/components/ember-mark";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
+import {
+  AlertCircleIcon,
+  ArrowRight01Icon,
+  CheckmarkCircle02Icon,
+  Loading03Icon,
+  RefreshIcon,
+} from "@hugeicons/core-free-icons";
 import { TRPCClientError } from "@trpc/client";
-import { AlertCircle, ArrowRight, Check, Loader2, RotateCcw } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
+import { Icon } from "@/components/icon";
 import { trpc } from "@/utils/trpc";
 
 // The one call to action on the site until the app opens: an email + button
@@ -154,7 +161,7 @@ export function NewsletterForm({
                 <EmberMark className="size-[18px]" />
               </>
             ) : (
-              <Check className="size-[18px] text-parchment" strokeWidth={1.8} />
+              <Icon icon={CheckmarkCircle02Icon} size={18} className="text-parchment" />
             )}
           </span>
           <div className="flex min-w-0 flex-col gap-1.5">
@@ -175,7 +182,7 @@ export function NewsletterForm({
               onClick={reset}
               className="mt-1 flex items-center gap-1.5 self-start text-[13px] text-ash underline underline-offset-[3px] hover:text-bone"
             >
-              <RotateCcw className="size-3" />
+              <Icon icon={RefreshIcon} size={13} />
               Use a different address
             </button>
           </div>
@@ -247,7 +254,7 @@ export function NewsletterForm({
         >
           {pending ? (
             <>
-              <Loader2 className="size-4 animate-spin" />
+              <Icon icon={Loading03Icon} size={16} className="animate-spin" />
               <span className="sr-only sm:not-sr-only">Joining</span>
             </>
           ) : (
@@ -255,7 +262,7 @@ export function NewsletterForm({
               {/* Phones get the short label so the address has room. */}
               <span className="sm:hidden">Join</span>
               <span className="hidden sm:inline">{buttonLabel}</span>
-              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+              <Icon icon={ArrowRight01Icon} size={16} className="transition-transform group-hover:translate-x-0.5" />
             </>
           )}
         </button>
@@ -267,7 +274,7 @@ export function NewsletterForm({
           role="alert"
           className="flex animate-in items-start gap-2 pl-4 text-[13px] leading-normal text-[#e0a294] duration-200 fade-in slide-in-from-top-1"
         >
-          <AlertCircle className="mt-0.5 size-3.5 flex-none" />
+          <Icon icon={AlertCircleIcon} size={14} className="mt-0.5" />
           <span>
             {failure.message}
             {failure.kind === "network" ? (

@@ -2,10 +2,17 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
-import { Search, UserMinus } from "lucide-react";
+import {
+  Download01Icon,
+  Search01Icon,
+  Upload01Icon,
+  UserGroupIcon,
+  UserMinus01Icon,
+} from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { Icon } from "@/components/icon";
 import { Button, Empty, GREEN, Loading, PageHeader, Segmented, StatusPill } from "@/components/kit";
 import { ago, day, downloadCsv, num } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -79,7 +86,7 @@ export default function SubscribersPage() {
         actions={
           <>
             <label className="flex h-[34px] w-full items-center gap-2.5 rounded-[9px] border border-white/9 bg-white/6 px-3 sm:w-[280px]">
-              <Search className="size-3.5 text-ash" />
+              <Icon icon={Search01Icon} size={14} className="text-ash" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -99,9 +106,13 @@ export default function SubscribersPage() {
                 }
               }}
             >
+              <Icon icon={Download01Icon} size={14} />
               Export
             </Button>
-            <Button pending={importCsv.isPending} onClick={() => fileInput.current?.click()}>Import CSV</Button>
+            <Button pending={importCsv.isPending} onClick={() => fileInput.current?.click()}>
+              <Icon icon={Upload01Icon} size={14} />
+              Import CSV
+            </Button>
             <input
               ref={fileInput}
               type="file"
@@ -136,7 +147,7 @@ export default function SubscribersPage() {
         <Loading />
       ) : data.rows.length === 0 ? (
         <div className="p-7">
-          <Empty title={query ? "Nobody matches that search." : "No one here yet."} body="Signups from the website land here the moment they happen." />
+          <Empty icon={UserGroupIcon} title={query ? "Nobody matches that search." : "No one here yet."} body="Signups from the website land here the moment they happen." />
         </div>
       ) : (
         <>
@@ -181,7 +192,7 @@ export default function SubscribersPage() {
                             onClick={() => window.confirm(`Remove ${s.email} from the list?`) && remove.mutate({ id: s.id })}
                             className="rounded-md p-1.5 text-stone opacity-0 group-hover:opacity-100 hover:bg-white/5 hover:text-[#e0a294] focus:opacity-100"
                           >
-                            <UserMinus className="size-3.5" />
+                            <Icon icon={UserMinus01Icon} size={14} />
                           </button>
                         ) : null}
                       </td>

@@ -5,10 +5,11 @@ import { EmberMark } from "@theinnerwar.app/ui/components/ember-mark";
 import { Eyebrow } from "@theinnerwar.app/ui/components/eyebrow";
 import { pillButtonVariants } from "@theinnerwar.app/ui/components/pill-button";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
-import { Check, Link2Off, Loader2 } from "lucide-react";
+import { CheckmarkCircle02Icon, Loading03Icon, Unlink01Icon } from "@hugeicons/core-free-icons";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { Icon } from "@/components/icon";
 import { trpc } from "@/utils/trpc";
 
 // The footer link in every letter lands here. Unsubscribing happens on load,
@@ -38,7 +39,7 @@ export function UnsubscribeCard() {
 
   if (!token || unsubscribe.isError) {
     return (
-      <Card icon={<Link2Off className="size-5 text-[#e0a294]" strokeWidth={1.8} />} tone="warn">
+      <Card icon={<Icon icon={Unlink01Icon} size={20} className="text-[#e0a294]" />} tone="warn">
         <Eyebrow tone="muted">LINK NOT VALID</Eyebrow>
         <Title>We couldn't read that link.</Title>
         <Body>
@@ -52,7 +53,7 @@ export function UnsubscribeCard() {
 
   if (!unsubscribe.isSuccess) {
     return (
-      <Card icon={<Loader2 className="size-5 animate-spin text-parchment" />} tone="stone">
+      <Card icon={<Icon icon={Loading03Icon} size={20} className="animate-spin text-parchment" />} tone="stone">
         <Eyebrow tone="muted">ONE MOMENT</Eyebrow>
         <Title>Taking you off the list.</Title>
       </Card>
@@ -60,7 +61,7 @@ export function UnsubscribeCard() {
   }
 
   return (
-    <Card icon={<Check className="size-5 text-parchment" strokeWidth={1.8} />} tone="stone">
+    <Card icon={<Icon icon={CheckmarkCircle02Icon} size={20} className="text-parchment" />} tone="stone">
       <Eyebrow tone="muted">UNSUBSCRIBED</Eyebrow>
       <Title>You're off the list.</Title>
       <Body>
@@ -73,7 +74,7 @@ export function UnsubscribeCard() {
           onClick={() => resubscribe.mutate({ token })}
           className={pillButtonVariants({ size: "sm", className: "shadow-none" })}
         >
-          {resubscribe.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          {resubscribe.isPending ? <Icon icon={Loading03Icon} size={16} className="animate-spin" /> : null}
           I changed my mind
         </button>
         <HomeLink inline />

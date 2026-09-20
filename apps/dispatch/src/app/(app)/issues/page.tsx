@@ -2,10 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
+import { Mail01Icon, MailOpen01Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ButtonLink, Empty, Flame, GREEN, Loading, PageHeader, Segmented, StatusPill } from "@/components/kit";
+import { Icon } from "@/components/icon";
 import { WriteIssueButton } from "@/components/write-issue";
 import { dateTime, day, num, pct } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -83,13 +85,20 @@ export default function IssuesPage() {
               </span>
             </span>
             <span className="flex flex-none gap-2">
-              <ButtonLink href={`/issues/${data.welcome.id}`} className="h-9">Report</ButtonLink>
-              <ButtonLink href={`/issues/${data.welcome.id}/edit`} className="h-9 border-white/18 text-bone">Edit</ButtonLink>
+              <ButtonLink href={`/issues/${data.welcome.id}`} className="h-9">
+                <Icon icon={MailOpen01Icon} size={14} />
+                Report
+              </ButtonLink>
+              <ButtonLink href={`/issues/${data.welcome.id}/edit`} className="h-9 border-white/18 text-bone">
+                <Icon icon={PencilEdit02Icon} size={14} />
+                Edit
+              </ButtonLink>
             </span>
           </div>
 
           {rows.length === 0 ? (
             <Empty
+              icon={Mail01Icon}
               title={filter === "all" ? "No broadcasts yet." : `No ${filter} issues.`}
               body="Write an issue, send yourself a test, then schedule it for the usual slot."
               action={<WriteIssueButton />}

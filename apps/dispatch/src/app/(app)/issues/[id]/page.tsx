@@ -1,10 +1,11 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { Cancel01Icon, Download01Icon, EyeIcon, Mail01Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
+import { Icon } from "@/components/icon";
 import { Bar, Button, ButtonLink, GREEN, Loading, Mono, Panel } from "@/components/kit";
 import { dateTime, downloadCsv, num, pct, time } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -44,8 +45,14 @@ export default function ReportPage() {
           <h1 className="font-serif text-[34px] leading-[1.06] tracking-[-0.03em] text-paper text-pretty lg:text-[38px]">{r.issue.subject}</h1>
         </span>
         <span className="flex flex-none gap-2.5">
-          <ButtonLink href={welcome ? `/issues/${id}/edit` : "/issues"} className="h-9">{welcome ? "Edit" : "All issues"}</ButtonLink>
-          <Button className="h-9" onClick={() => setViewing(true)}>View the email</Button>
+          <ButtonLink href={welcome ? `/issues/${id}/edit` : "/issues"} className="h-9">
+            <Icon icon={welcome ? PencilEdit02Icon : Mail01Icon} size={14} />
+            {welcome ? "Edit" : "All issues"}
+          </ButtonLink>
+          <Button className="h-9" onClick={() => setViewing(true)}>
+            <Icon icon={EyeIcon} size={14} />
+            View the email
+          </Button>
           <Button
             className="h-9"
             pending={exporting}
@@ -59,6 +66,7 @@ export default function ReportPage() {
               }
             }}
           >
+            <Icon icon={Download01Icon} size={14} />
             Export CSV
           </Button>
         </span>
@@ -135,7 +143,7 @@ export default function ReportPage() {
         <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/70 p-4 sm:p-10" onClick={() => setViewing(false)}>
           <div className="relative flex w-full max-w-[720px] flex-col overflow-hidden rounded-2xl bg-[#e9e3d8]" onClick={(e) => e.stopPropagation()}>
             <button type="button" aria-label="Close" onClick={() => setViewing(false)} className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-black/60 text-white">
-              <X className="size-4" />
+              <Icon icon={Cancel01Icon} size={16} />
             </button>
             {email.data ? <iframe title="The email" sandbox="" srcDoc={email.data.html} className="h-full w-full flex-1 border-0" /> : <Loading />}
           </div>
