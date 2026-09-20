@@ -1,9 +1,11 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MailSend01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { Icon } from "@/components/icon";
 import { Button, Loading, Mono, Panel } from "@/components/kit";
 import { WEEKDAYS } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -157,9 +159,11 @@ export default function SettingsPage() {
             })
           }
         >
+          <Icon icon={Tick02Icon} size={16} />
           Save settings
         </Button>
         <Button size="lg" className="h-12 rounded-full px-[22px] text-sm" pending={test.isPending} disabled={shell.data?.canSend === false} onClick={() => test.mutate()}>
+          <Icon icon={MailSend01Icon} size={15} />
           Send myself a test
         </Button>
         {shell.data?.canSend === false ? <span className="text-[13px] text-[#e0a294]">SMTP isn&apos;t configured on the server.</span> : null}

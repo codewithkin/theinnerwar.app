@@ -1,9 +1,19 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import {
+  Analytics01Icon,
+  ArrowRight01Icon,
+  Calendar03Icon,
+  MailOpen01Icon,
+  Target01Icon,
+  UserGroupIcon,
+  UserMinus01Icon,
+} from "@hugeicons/core-free-icons";
 import Link from "next/link";
 
 import { Bar, ButtonLink, GREEN, Loading, Mono, PageHeader, Panel, StatCard } from "@/components/kit";
+import { Icon } from "@/components/icon";
 import { WriteIssueButton } from "@/components/write-issue";
 import { ago, day, delta, num, pct } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -21,7 +31,10 @@ export default function OverviewPage() {
         <div className="flex flex-col gap-[18px] px-5 py-[26px] lg:px-7">
           <div className="flex flex-col gap-[18px] xl:flex-row">
             <Panel tone="ember" className="flex flex-none flex-col gap-3.5 p-6 xl:w-[420px]">
-              <Mono className="tracking-[0.18em] text-ember-glow">CONVERSION RATE</Mono>
+              <Mono className="flex items-center gap-2 tracking-[0.18em] text-ember-glow">
+                <Icon icon={Analytics01Icon} size={13} />
+                CONVERSION RATE
+              </Mono>
               <span className="flex items-baseline gap-3">
                 <span className="font-serif text-[72px] leading-[0.88] tracking-[-0.04em] text-paper">{pct(data.conversionRate)}</span>
                 {(() => {
@@ -44,24 +57,28 @@ export default function OverviewPage() {
 
             <div className="grid min-w-0 flex-1 grid-cols-1 gap-3.5 sm:grid-cols-2">
               <StatCard
+                icon={UserGroupIcon}
                 label="SUBSCRIBERS"
                 value={num(data.activeSubscribers)}
                 note={`${num(data.last30Days.joined)} joined this month`}
                 delta={delta(data.last30Days.joined, data.previous30Days.joined)}
               />
               <StatCard
+                icon={Target01Icon}
                 label="SIGNUPS FROM THE LIST"
                 value={num(data.last30Days.converted)}
                 note={`this month, ${num(data.converted)} all time`}
                 delta={delta(data.last30Days.converted, data.previous30Days.converted)}
               />
               <StatCard
+                icon={MailOpen01Icon}
                 label="OPEN RATE"
                 value={data.lastIssue ? pct(data.lastIssue.openRate) : "—"}
                 note={`last issue, ${num(data.sentCount)} sent total`}
                 delta={data.lastIssue && data.previousIssue ? delta(data.lastIssue.openRate, data.previousIssue.openRate, true) : null}
               />
               <StatCard
+                icon={UserMinus01Icon}
                 label="UNSUBSCRIBES"
                 value={pct(data.unsubscribeRate)}
                 note={`${num(data.last30Days.unsubscribed)} people in the last 30 days`}
@@ -92,7 +109,10 @@ export default function OverviewPage() {
 
             <div className="flex flex-none flex-col gap-3.5 xl:w-[380px]">
               <Panel className="flex flex-col gap-3 p-5">
-                <Mono>{data.lastIssue ? `LAST ISSUE · SENT ${day(data.lastIssue.sentAt).toUpperCase()}` : "LAST ISSUE"}</Mono>
+                <Mono className="flex items-center gap-2">
+                  <Icon icon={Calendar03Icon} size={12} />
+                  {data.lastIssue ? `LAST ISSUE · SENT ${day(data.lastIssue.sentAt).toUpperCase()}` : "LAST ISSUE"}
+                </Mono>
                 {data.lastIssue ? (
                   <>
                     <span className="font-serif text-2xl leading-[1.16] tracking-[-0.018em] text-cream text-pretty">{data.lastIssue.subject}</span>
@@ -109,6 +129,7 @@ export default function OverviewPage() {
                       ))}
                     </div>
                     <ButtonLink href={`/issues/${data.lastIssue.id}`} className="h-10 rounded-full">
+                      <Icon icon={Analytics01Icon} size={14} />
                       Open the report
                     </ButtonLink>
                   </>
@@ -137,8 +158,9 @@ export default function OverviewPage() {
               </Panel>
             </div>
           </div>
-          <Link href="/conversions" className="self-start text-[13px] text-ash underline underline-offset-[3px] hover:text-bone">
-            See every conversion →
+          <Link href="/conversions" className="flex items-center gap-1.5 self-start text-[13px] text-ash underline underline-offset-[3px] hover:text-bone">
+            See every conversion
+            <Icon icon={ArrowRight01Icon} size={14} />
           </Link>
         </div>
       )}

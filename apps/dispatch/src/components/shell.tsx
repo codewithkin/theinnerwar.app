@@ -2,7 +2,17 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
-import { LogOut, Menu, X } from "lucide-react";
+import {
+  Analytics01Icon,
+  Cancel01Icon,
+  DashboardSquare01Icon,
+  Logout03Icon,
+  Mail01Icon,
+  Menu01Icon,
+  Settings02Icon,
+  ShieldCheckIcon,
+  UserGroupIcon,
+} from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -11,17 +21,18 @@ import { dateTime } from "@/lib/format";
 import { clearSession, readSession } from "@/lib/session";
 import { trpc } from "@/lib/trpc";
 
+import { Icon } from "./icon";
 import { Flame, Mono } from "./kit";
 
 // The persistent rail from every Dispatch screen (N1–N9).
 
 const NAV = [
-  { href: "/", label: "Overview", radius: "4px" },
-  { href: "/issues", label: "Issues", radius: "2px", badge: "issues" as const },
-  { href: "/subscribers", label: "Subscribers", radius: "999px" },
-  { href: "/conversions", label: "Conversions", radius: "999px" },
-  { href: "/deliverability", label: "Deliverability", radius: "1px" },
-  { href: "/settings", label: "Settings", radius: "999px" },
+  { href: "/", label: "Overview", icon: DashboardSquare01Icon },
+  { href: "/issues", label: "Issues", icon: Mail01Icon, badge: "issues" as const },
+  { href: "/subscribers", label: "Subscribers", icon: UserGroupIcon },
+  { href: "/conversions", label: "Conversions", icon: Analytics01Icon },
+  { href: "/deliverability", label: "Deliverability", icon: ShieldCheckIcon },
+  { href: "/settings", label: "Settings", icon: Settings02Icon },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -69,7 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 active ? "bg-ember/13 text-ember-glow" : "text-stone-muted hover:bg-white/[0.04] hover:text-bone",
               )}
             >
-              <span className="size-[14px] flex-none border-[1.6px] border-current" style={{ borderRadius: n.radius }} />
+              <Icon icon={n.icon} size={17} />
               <span className="flex-1 text-sm">{n.label}</span>
               {badge ? <span className="font-mono text-[10px] text-slate">{badge}</span> : null}
             </Link>
@@ -110,7 +121,7 @@ export function Shell({ children }: { children: ReactNode }) {
           }}
           className="flex size-8 items-center justify-center rounded-lg text-stone hover:bg-white/5 hover:text-bone"
         >
-          <LogOut className="size-4" />
+          <Icon icon={Logout03Icon} size={16} />
         </button>
       </div>
     </nav>
@@ -127,14 +138,14 @@ export function Shell({ children }: { children: ReactNode }) {
         onClick={() => setOpen(true)}
         className="fixed right-4 bottom-4 z-30 flex size-12 items-center justify-center rounded-full bg-ember-gradient text-button-ink shadow-lg lg:hidden"
       >
-        <Menu className="size-5" />
+        <Icon icon={Menu01Icon} size={20} />
       </button>
       {open ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button type="button" aria-label="Close navigation" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
           <aside className="relative h-full w-[260px] border-r border-white/8">
             <button type="button" aria-label="Close" onClick={() => setOpen(false)} className="absolute top-4 right-3 z-10 text-stone-muted">
-              <X className="size-5" />
+              <Icon icon={Cancel01Icon} size={20} />
             </button>
             {rail}
           </aside>

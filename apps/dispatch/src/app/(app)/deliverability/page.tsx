@@ -2,9 +2,19 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
+import {
+  Alert02Icon,
+  Cancel01Icon,
+  MailValidation01Icon,
+  MailRemove01Icon,
+  RefreshIcon,
+  ShieldCheckIcon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Icon } from "@/components/icon";
 import { Bar, Button, GREEN, Loading, Mono, Panel, StatCard, StatusPill } from "@/components/kit";
 import { ago, day, num, pct } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -45,19 +55,25 @@ export default function DeliverabilityPage() {
             Sending domain {data.domain ?? "not set"} · checked {ago(data.checkedAt)}
           </span>
         </span>
-        <Button pending={d.isFetching} onClick={() => d.refetch()}>Re-run checks</Button>
+        <Button pending={d.isFetching} onClick={() => d.refetch()}>
+          <Icon icon={RefreshIcon} size={14} />
+          Re-run checks
+        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard tone="green" label="DELIVERED" value={pct(data.stats.deliveredRate)} note={`${num(data.stats.delivered)} of ${num(data.attempted)} ${data.scope.kind === "BROADCAST" ? `in issue ${data.scope.number}` : "welcome emails, last 30 days"}`} />
-        <StatCard label="BOUNCE RATE" value={pct(data.stats.bounceRate, 2)} note={data.stats.bounceRate < 0.02 ? "Well under the 2% threshold" : "Above 2%: clean the list"} />
-        <StatCard label="SPAM COMPLAINTS" value={pct(data.stats.complaintRate, 2)} note={`${num(data.stats.complaints)} reported`} />
-        <StatCard label="FAILED TO SEND" value={num(data.stats.failed)} note="SMTP errors that weren't bounces" />
+        <StatCard tone="green" icon={MailValidation01Icon} label="DELIVERED" value={pct(data.stats.deliveredRate)} note={`${num(data.stats.delivered)} of ${num(data.attempted)} ${data.scope.kind === "BROADCAST" ? `in issue ${data.scope.number}` : "welcome emails, last 30 days"}`} />
+        <StatCard icon={MailRemove01Icon} label="BOUNCE RATE" value={pct(data.stats.bounceRate, 2)} note={data.stats.bounceRate < 0.02 ? "Well under the 2% threshold" : "Above 2%: clean the list"} />
+        <StatCard icon={Alert02Icon} label="SPAM COMPLAINTS" value={pct(data.stats.complaintRate, 2)} note={`${num(data.stats.complaints)} reported`} />
+        <StatCard icon={Cancel01Icon} label="FAILED TO SEND" value={num(data.stats.failed)} note="SMTP errors that weren't bounces" />
       </div>
 
       <div className="flex flex-col gap-[18px] xl:flex-row">
         <Panel className="flex flex-none flex-col px-[22px] py-1.5 xl:w-[520px]">
-          <Mono className="pt-[18px] pb-2.5">DOMAIN AUTHENTICATION</Mono>
+          <Mono className="flex items-center gap-2 pt-[18px] pb-2.5">
+            <Icon icon={ShieldCheckIcon} size={12} />
+            DOMAIN AUTHENTICATION
+          </Mono>
           {data.checks.map((c) => (
             <div key={c.key} className="flex min-h-[68px] items-center gap-3.5 border-t border-white/7 py-3">
               <span
@@ -68,7 +84,7 @@ export default function DeliverabilityPage() {
                   (c.status === "MISSING" || c.status === "UNKNOWN") && "border-[rgba(190,90,68,0.4)] bg-[rgba(110,42,28,0.3)] text-[#e0a294]",
                 )}
               >
-                {c.status === "PASSING" ? "✓" : c.status === "WARNING" ? "!" : "×"}
+                <Icon icon={c.status === "PASSING" ? Tick02Icon : c.status === "WARNING" ? Alert02Icon : Cancel01Icon} size={13} />
               </span>
               <span className="w-[62px] flex-none font-mono text-xs text-bone">{c.key}</span>
               <span className="flex min-w-0 flex-1 flex-col">

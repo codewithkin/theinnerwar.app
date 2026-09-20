@@ -2,11 +2,20 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
+import {
+  Alert02Icon,
+  ArrowLeft01Icon,
+  MailSend01Icon,
+  SentIcon,
+  Tick02Icon,
+  Timer02Icon,
+} from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { Icon } from "@/components/icon";
 import { Bar, Button, ButtonLink, Flame, GREEN, Loading, Mono, Panel } from "@/components/kit";
 import { ago, dateTime, nextSlot, num, pct, time, WEEKDAYS } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -69,8 +78,8 @@ export default function SendPage() {
     <div className="flex min-h-svh flex-col xl:flex-row">
       <section className="flex min-w-0 flex-1 flex-col gap-6 px-5 py-10 lg:px-14 lg:py-12">
         <div className="flex items-center gap-4">
-          <Link href={`/issues/${id}/edit`} aria-label="Back to the editor" className="flex size-[34px] items-center justify-center rounded-[9px] border border-white/14">
-            <span className="-ml-0.5 size-[7px] rotate-45 border-b-[1.6px] border-l-[1.6px] border-parchment" />
+          <Link href={`/issues/${id}/edit`} aria-label="Back to the editor" className="flex size-[34px] items-center justify-center rounded-[9px] border border-white/14 text-parchment">
+            <Icon icon={ArrowLeft01Icon} size={16} />
           </Link>
           <Mono className="tracking-[0.2em] text-ember-glow">
             ISSUE {issue.number ?? "—"} · {status === "DRAFT" ? "READY TO SEND" : status}
@@ -121,7 +130,7 @@ export default function SendPage() {
                       c.ok ? "border-[rgba(143,184,148,0.4)] bg-[rgba(111,152,115,0.18)] text-[#8fb894]" : "border-ember-light/40 bg-ember/15 text-ember-pale",
                     )}
                   >
-                    {c.ok ? "✓" : "!"}
+                    <Icon icon={c.ok ? Tick02Icon : Alert02Icon} size={13} />
                   </span>
                   <Mono className="w-[150px] flex-none text-[9px] tracking-[0.14em] text-stone">{c.k}</Mono>
                   <span className="min-w-0 flex-1 truncate text-[15px] text-bone">{c.v}</span>
@@ -181,6 +190,7 @@ export default function SendPage() {
                     disabled={!scheduledAt}
                     onClick={() => scheduledAt && schedule.mutate({ id, at: scheduledAt })}
                   >
+                    <Icon icon={Timer02Icon} size={17} />
                     Schedule this issue
                   </Button>
                 ) : (
@@ -193,10 +203,12 @@ export default function SendPage() {
                       if (window.confirm(`Send “${issue.subject}” to ${audience} people now? There is no recall.`)) sendNow.mutate({ id });
                     }}
                   >
+                    <Icon icon={SentIcon} size={17} />
                     Send it now
                   </Button>
                 )}
                 <Button size="lg" className="rounded-full px-6" pending={test.isPending} disabled={!canSend} onClick={() => test.mutate({ id })}>
+                  <Icon icon={MailSend01Icon} size={16} />
                   Send one more test
                 </Button>
                 <Link href={`/issues/${id}/edit`} className="text-sm text-ash underline underline-offset-[3px] hover:text-bone sm:ml-auto">Back to the editor</Link>

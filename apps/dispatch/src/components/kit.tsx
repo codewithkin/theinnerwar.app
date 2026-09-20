@@ -1,9 +1,12 @@
 "use client";
 
+import { ArrowLeft01Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+
+import { Icon } from "./icon";
+import type { IconSvgElement } from "@hugeicons/react";
 
 // Building blocks repeated across the Dispatch screens (designs/Newsletter N1–N9).
 
@@ -47,6 +50,7 @@ export function StatCard({
   delta,
   tone = "plain",
   labelClassName,
+  icon,
 }: {
   label: string;
   value: ReactNode;
@@ -54,6 +58,7 @@ export function StatCard({
   delta?: { text: string; up: boolean | null; good?: boolean } | null;
   tone?: "plain" | "ember" | "green";
   labelClassName?: string;
+  icon?: IconSvgElement;
 }) {
   const good = delta ? (delta.good ?? delta.up) : null;
   return (
@@ -66,7 +71,10 @@ export function StatCard({
       )}
     >
       <span className="flex items-center justify-between gap-2">
-        <Mono className={cn("text-[9px]", tone === "ember" && "text-ember-glow", tone === "green" && "text-[#8fb894]", labelClassName)}>{label}</Mono>
+        <Mono className={cn("flex items-center gap-1.5 text-[9px]", tone === "ember" && "text-ember-glow", tone === "green" && "text-[#8fb894]", labelClassName)}>
+          {icon ? <Icon icon={icon} size={12} /> : null}
+          {label}
+        </Mono>
         {delta ? (
           <span className={cn("font-mono text-[10px]", good === null ? "text-stone" : good ? "text-[#8fb894]" : "text-[#e0a294]")}>{delta.text}</span>
         ) : null}
@@ -100,7 +108,7 @@ function buttonClass({ variant = "outline", size = "md", className }: ButtonProp
 export function Button({ variant, size, pending, className, children, disabled, ...props }: ButtonProps & ComponentProps<"button">) {
   return (
     <button type="button" className={buttonClass({ variant, size, className })} disabled={disabled || pending} {...props}>
-      {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+      {pending ? <Icon icon={Loading03Icon} size={14} className="animate-spin" /> : null}
       {children}
     </button>
   );
@@ -149,8 +157,8 @@ export function PageHeader({ title, meta, actions, back }: { title: ReactNode; m
     <header className="sticky top-0 z-10 flex min-h-[62px] flex-none flex-wrap items-center justify-between gap-3 border-b border-white/8 bg-charcoal/95 px-5 py-3 backdrop-blur lg:px-7">
       <span className="flex min-w-0 items-center gap-4">
         {back ? (
-          <Link href={back} aria-label="Back" className="flex size-8 flex-none items-center justify-center rounded-[9px] border border-white/14 hover:border-white/25">
-            <span className="-ml-0.5 size-[7px] rotate-45 border-b-[1.6px] border-l-[1.6px] border-parchment" />
+          <Link href={back} aria-label="Back" className="flex size-8 flex-none items-center justify-center rounded-[9px] border border-white/14 text-parchment hover:border-white/25">
+            <Icon icon={ArrowLeft01Icon} size={16} />
           </Link>
         ) : null}
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -166,15 +174,20 @@ export function PageHeader({ title, meta, actions, back }: { title: ReactNode; m
 export function Loading({ label = "Loading" }: { label?: string }) {
   return (
     <div className="flex flex-1 items-center justify-center gap-3 p-16 text-sm text-ash">
-      <Loader2 className="size-4 animate-spin text-ember-glow" />
+      <Icon icon={Loading03Icon} size={16} className="animate-spin text-ember-glow" />
       {label}
     </div>
   );
 }
 
-export function Empty({ title, body, action }: { title: string; body?: ReactNode; action?: ReactNode }) {
+export function Empty({ title, body, action, icon }: { title: string; body?: ReactNode; action?: ReactNode; icon?: IconSvgElement }) {
   return (
     <div className="flex flex-col items-start gap-2 rounded-[18px] border border-dashed border-white/14 p-6">
+      {icon ? (
+        <span className="mb-1 flex size-10 items-center justify-center rounded-full border border-white/12 bg-white/5 text-stone-muted">
+          <Icon icon={icon} size={18} />
+        </span>
+      ) : null}
       <span className="font-serif text-xl text-cream">{title}</span>
       {body ? <p className="max-w-[520px] text-sm leading-[1.55] text-ash text-pretty">{body}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}

@@ -1,12 +1,22 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ComputerIcon,
+  MailSend01Icon,
+  Moon02Icon,
+  Note03Icon,
+  SentIcon,
+  SmartPhone01Icon,
+  TextFontIcon,
+} from "@hugeicons/core-free-icons";
 import { subjectVerdict } from "@theinnerwar.app/api/newsletter/analyze";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { Icon } from "@/components/icon";
 import { Button, ButtonLink, GREEN, Loading, Mono, PageHeader } from "@/components/kit";
 import { ago } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -124,6 +134,7 @@ export default function EditorPage() {
             <span className="flex gap-1.5">
               {(["write", "plain"] as const).map((m) => (
                 <Button key={m} variant={mode === m ? "soft" : "outline"} onClick={() => setMode(m)}>
+                  <Icon icon={m === "write" ? Note03Icon : TextFontIcon} size={14} />
                   {m === "write" ? "Write" : "Plain text"}
                 </Button>
               ))}
@@ -136,6 +147,7 @@ export default function EditorPage() {
                 test.mutate({ id });
               }}
             >
+              <Icon icon={MailSend01Icon} size={14} />
               Send a test
             </Button>
             {welcome ? (
@@ -143,7 +155,7 @@ export default function EditorPage() {
             ) : editable ? (
               <Button variant="ember" onClick={() => flushAndGo(`/issues/${id}/send`)}>
                 Continue to send
-                <span className="size-[5px] rotate-45 border-t-[1.5px] border-r-[1.5px] border-button-ink" />
+                <Icon icon={SentIcon} size={14} />
               </Button>
             ) : (
               <ButtonLink href={`/issues/${id}`} variant="outline">Open the report</ButtonLink>
@@ -222,8 +234,12 @@ export default function EditorPage() {
                   key={v}
                   type="button"
                   onClick={() => setView(v)}
-                  className={cn("h-[26px] rounded-[7px] px-[11px] font-mono text-[9px]", view === v ? "bg-white/8 text-parchment" : "text-stone hover:text-bone")}
+                  className={cn(
+                    "flex h-[26px] items-center gap-1.5 rounded-[7px] px-[11px] font-mono text-[9px]",
+                    view === v ? "bg-white/8 text-parchment" : "text-stone hover:text-bone",
+                  )}
                 >
+                  <Icon icon={v === "desktop" ? ComputerIcon : v === "mobile" ? SmartPhone01Icon : Moon02Icon} size={12} />
                   {v.toUpperCase()}
                 </button>
               ))}

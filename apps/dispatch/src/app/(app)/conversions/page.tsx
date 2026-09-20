@@ -1,9 +1,16 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  Analytics01Icon,
+  Award01Icon,
+  Book02Icon,
+  Target01Icon,
+} from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useState } from "react";
 
+import { Icon } from "@/components/icon";
 import { Bar, GREEN, Loading, Mono, Panel, Segmented, StatCard } from "@/components/kit";
 import { num, pct } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -41,15 +48,17 @@ export default function ConversionsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard tone="ember" label="CONVERSION RATE" value={pct(data.conversionRate)} note="All subscribers who now have an account" />
-        <StatCard label={`SIGNUPS ${range === "all" ? "ALL TIME" : range === "quarter" ? "THIS QUARTER" : "THIS MONTH"}`} value={num(data.signups)} note={`From ${num(data.joined)} new subscribers ${rangeLabel}`} />
+        <StatCard tone="ember" icon={Analytics01Icon} label="CONVERSION RATE" value={pct(data.conversionRate)} note="All subscribers who now have an account" />
+        <StatCard icon={Target01Icon} label={`SIGNUPS ${range === "all" ? "ALL TIME" : range === "quarter" ? "THIS QUARTER" : "THIS MONTH"}`} value={num(data.signups)} note={`From ${num(data.joined)} new subscribers ${rangeLabel}`} />
         <StatCard
+          icon={Book02Icon}
           label="ISSUES BEFORE SIGNUP"
           value={data.medianIssuesBeforeSignup === null ? "—" : String(Math.round(data.medianIssuesBeforeSignup * 10) / 10)}
           note={data.signups ? `Median across ${num(data.signups)}` : "No signups in this range"}
         />
         <StatCard
           tone="green"
+          icon={Award01Icon}
           label="BEST ISSUE"
           value={data.best ? num(data.best.signups) : "—"}
           note={data.best ? `No. ${data.best.number}, ${data.best.subject}` : "No broadcast signups yet"}

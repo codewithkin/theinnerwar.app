@@ -1,10 +1,11 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircleIcon, Loading03Icon, LockKeyIcon } from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { Icon } from "@/components/icon";
 import { Flame, Mono } from "@/components/kit";
 import { readSession, saveSession } from "@/lib/session";
 import { serverUrl, trpc } from "@/lib/trpc";
@@ -67,7 +68,7 @@ export default function LoginPage() {
         </label>
         {login.error ? (
           <p role="alert" className="flex items-center gap-2 text-[13px] text-[#e0a294]">
-            <AlertCircle className="size-3.5" />
+            <Icon icon={AlertCircleIcon} size={14} />
             {login.error.message}
           </p>
         ) : null}
@@ -76,7 +77,7 @@ export default function LoginPage() {
           disabled={login.isPending}
           className="flex h-12 items-center justify-center gap-2 rounded-full bg-ember-gradient text-[15px] font-semibold text-button-ink hover:brightness-110 disabled:opacity-60"
         >
-          {login.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Icon icon={login.isPending ? Loading03Icon : LockKeyIcon} size={16} className={login.isPending ? "animate-spin" : undefined} />
           Sign in
         </button>
         <span className="font-mono text-[9px] text-slate">API · {serverUrl}</span>
