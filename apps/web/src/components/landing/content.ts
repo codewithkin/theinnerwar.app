@@ -1,12 +1,29 @@
 // Landing copy, verbatim from designs/Website (W1 · §1.1).
+import {
+  Book02Icon,
+  Calendar03Icon,
+  CheckmarkBadge03Icon,
+  Clock01Icon,
+  Coins01Icon,
+  Compass01Icon,
+  Idea01Icon,
+  InstagramIcon,
+  Linkedin02Icon,
+  Mail01Icon,
+  NewTwitterIcon,
+  PencilEdit02Icon,
+  Route01Icon,
+  Target01Icon,
+  TickDouble02Icon,
+} from "@hugeicons/core-free-icons";
 import type { LedgerState } from "@theinnerwar.app/ui/components/ledger";
 
 export const nav = [
-  { i: "01", label: "How it works", href: "/#how-it-works" },
-  { i: "02", label: "Paths", href: "/#paths" },
-  { i: "03", label: "Books", href: "/#books" },
-  { i: "04", label: "Pricing", href: "/#pricing" },
-  { i: "05", label: "Philosophy", href: "/#philosophy" },
+  { i: "01", label: "How it works", href: "/#how-it-works", icon: Route01Icon },
+  { i: "02", label: "Paths", href: "/#paths", icon: Compass01Icon },
+  { i: "03", label: "Books", href: "/#books", icon: Book02Icon },
+  { i: "04", label: "Pricing", href: "/#pricing", icon: Coins01Icon },
+  { i: "05", label: "Philosophy", href: "/#philosophy", icon: Idea01Icon },
 ] as const;
 
 // Until the app opens, every call to action joins the newsletter.
@@ -14,9 +31,9 @@ export const letterNote =
   "One letter every Sunday: a story or a principle you can use that week. You'll hear here first when the app opens.";
 
 export const heroStats = [
-  { v: "30", k: "DAYS PER CAMPAIGN" },
-  { v: "15", k: "MINUTES A DAY" },
-  { v: "9", k: "PATHS, FOUR BOOKS" },
+  { v: "30", k: "DAYS PER CAMPAIGN", icon: Calendar03Icon },
+  { v: "15", k: "MINUTES A DAY", icon: Clock01Icon },
+  { v: "9", k: "PATHS, FOUR BOOKS", icon: Book02Icon },
 ] as const;
 
 // The sample campaign shown on the landing page: day 12, day 9 missed.
@@ -30,9 +47,9 @@ export const sampleLedger = Array.from({ length: 30 }, (_, i) => {
 export const books = ["The War of Art", "Meditations", "Atomic Habits", "Think and Grow Rich"];
 
 export const askRows = [
-  { k: "Minutes a day", v: "15" },
-  { k: "Days in a campaign", v: "30" },
-  { k: "Decisions each day", v: "1" },
+  { k: "Minutes a day", v: "15", icon: Clock01Icon },
+  { k: "Days in a campaign", v: "30", icon: Calendar03Icon },
+  { k: "Decisions each day", v: "1", icon: TickDouble02Icon },
 ] as const;
 
 export const gapPoints = [
@@ -56,24 +73,28 @@ export const loop = [
     t: "Read the principle",
     d: "Three minutes. One idea from the book, written for the pattern you are working on.",
     meta: "3 MIN",
+    icon: Book02Icon,
   },
   {
     n: "02",
     t: "Take the mission",
     d: "One action at the hour you named. A smaller version is always offered.",
     meta: "15 MIN",
+    icon: Target01Icon,
   },
   {
     n: "03",
     t: "Write the reflection",
     d: "What happened, and how hard it actually was. Private, always.",
     meta: "2 MIN",
+    icon: PencilEdit02Icon,
   },
   {
     n: "04",
     t: "Save the evidence",
     d: "One sentence that proves you acted. It joins your library and your Personal Code.",
     meta: "1 MIN",
+    icon: CheckmarkBadge03Icon,
   },
 ] as const;
 
@@ -222,4 +243,9 @@ export const footerCols = [
   { h: "LEGAL", links: ["Privacy", "Terms", "Attribution", "Refunds"] },
 ] as const;
 
-export const social = ["X", "IG", "in", "✉"] as const;
+export const social = [
+  { label: "X", icon: NewTwitterIcon },
+  { label: "Instagram", icon: InstagramIcon },
+  { label: "LinkedIn", icon: Linkedin02Icon },
+  { label: "Email", icon: Mail01Icon },
+] as const;
