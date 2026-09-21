@@ -1,5 +1,5 @@
 # Build from the monorepo root:
-#   docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_SERVER_URL=https://api.innerwar.app -t innerwar-web .
+#   docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_SERVER_URL=https://api.innerwar.app --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID=G-WF1ZSK7XE7 -t innerwar-web .
 FROM node:22-slim AS builder
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
@@ -22,6 +22,10 @@ COPY apps/native/.env.schema apps/native/
 # URL of apps/server, e.g. https://api.innerwar.app.
 ARG NEXT_PUBLIC_SERVER_URL=http://localhost:3000
 ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
+# Optional override for the built-in Google Analytics measurement ID, baked in
+# at build time.
+ARG NEXT_PUBLIC_GA_MEASUREMENT_ID=
+ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=${NEXT_PUBLIC_GA_MEASUREMENT_ID}
 # Server schemas are validated by codegen during install: placeholders only.
 ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
 ENV BETTER_AUTH_SECRET=build-time-placeholder-secret-not-used-at-runtime

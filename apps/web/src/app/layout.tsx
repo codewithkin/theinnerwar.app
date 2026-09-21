@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo, JetBrains_Mono, Newsreader } from "next/font/google";
 
 import "../index.css";
+import GoogleAnalytics from "@/components/google-analytics";
 import Providers from "@/components/providers";
 import PwaRegistration from "@/components/pwa-registration";
 
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body
         className={`${archivo.variable} ${newsreader.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <GoogleAnalytics />
         <PwaRegistration />
         <Providers>{children}</Providers>
       </body>
