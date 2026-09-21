@@ -354,7 +354,10 @@ export function Pricing() {
 
 export function Faq() {
   return (
-    <section className="flex flex-col gap-10 bg-charcoal px-4 pt-20 pb-24 sm:px-11 lg:flex-row lg:items-start lg:gap-[70px] lg:pt-[92px] lg:pb-[100px]">
+    <section
+      id="faq"
+      className="flex flex-col gap-10 bg-charcoal px-4 pt-20 pb-24 sm:px-11 lg:flex-row lg:items-start lg:gap-[70px] lg:pt-[92px] lg:pb-[100px]"
+    >
       <div className="flex flex-none flex-col gap-4 lg:w-[340px]">
         <Eyebrow>QUESTIONS</Eyebrow>
         <h2 className="display text-[40px] leading-[1.06] tracking-[-0.03em] text-paper sm:text-[46px]">
@@ -434,7 +437,12 @@ export function Footer() {
                 const href = anchorFor.get(l);
                 const cls = "border-l border-white/18 pl-3 text-sm text-stone-muted no-underline";
                 return href ? (
-                  <a key={l} href={href} className={cn(cls, "hover:text-bone")}>
+                  <a
+                    key={l}
+                    href={href}
+                    data-cta={`footer:${l.toLowerCase().replace(/\s+/g, "-")}`}
+                    className={cn(cls, "hover:text-bone")}
+                  >
                     {l}
                   </a>
                 ) : (

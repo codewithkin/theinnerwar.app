@@ -60,7 +60,11 @@ export default async function PathDetail({ params }: Props) {
               buttonLabel="Join the letters"
               note={letterNote}
             />
-            <a href="#sample" className="self-start text-sm text-stone-muted hover:text-bone">
+            <a
+              href="#sample"
+              data-cta={`path-${path.slug}:read-day-1-lesson`}
+              className="self-start text-sm text-stone-muted hover:text-bone"
+            >
               Read the day 1 lesson
             </a>
           </div>

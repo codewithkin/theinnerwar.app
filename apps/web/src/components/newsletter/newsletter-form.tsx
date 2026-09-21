@@ -14,6 +14,7 @@ import { TRPCClientError } from "@trpc/client";
 import { useId, useRef, useState } from "react";
 
 import { Icon } from "@/components/icon";
+import { track } from "@/lib/analytics";
 import { trpc } from "@/utils/trpc";
 
 // The one call to action on the site until the app opens: an email + button
@@ -110,7 +111,14 @@ export function NewsletterForm({
 
   const subscribe = useMutation(
     trpc.newsletter.subscribe.mutationOptions({
-      onSuccess: (data) => setSuccess(data),
+      onSuccess: (data) => {
+        setSuccess(data);
+        track("newsletter_signup", {
+          source,
+          state: data.state,
+          page_path: window.location.pathname,
+        });
+      },
       onError: (error) => setFailure(toFailure(error)),
     }),
   );

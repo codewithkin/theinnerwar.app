@@ -26,6 +26,7 @@ export function Nav() {
             <a
               key={n.i}
               href={n.href}
+              data-cta={`nav:${n.label.toLowerCase().replace(/\s+/g, "-")}`}
               className="flex items-baseline gap-1.5 no-underline hover:text-ember-glow"
             >
               <Icon icon={n.icon} size={14} className={idx === 0 ? "text-ember-glow" : "text-stone"} />
@@ -35,7 +36,11 @@ export function Nav() {
             </a>
           ))}
         </span>
-        <a href="/#join" className={cn(pillButtonVariants({ size: "sm" }), "shadow-none")}>
+        <a
+          href="/#join"
+          data-cta="nav:get-the-letters"
+          className={cn(pillButtonVariants({ size: "sm" }), "shadow-none")}
+        >
           Get the letters
         </a>
       </nav>
@@ -72,6 +77,7 @@ export function Hero() {
           />
           <a
             href="#how-it-works"
+            data-cta="hero:see-how-a-day-works"
             className="flex items-center gap-2.5 self-start text-[15px] text-bone no-underline hover:text-ember-glow"
           >
             See how a day works
