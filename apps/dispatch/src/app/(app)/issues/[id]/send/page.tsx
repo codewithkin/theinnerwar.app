@@ -40,6 +40,7 @@ export default function SendPage() {
 
   const [mode, setMode] = useState<"schedule" | "now">("schedule");
   const [when, setWhen] = useState("");
+  const [testTo, setTestTo] = useState("");
   useEffect(() => {
     if (pre.data && !when) {
       setWhen(toLocalInput(nextSlot(pre.data.settings.usualSlotDay, pre.data.settings.usualSlotTime)));
@@ -55,17 +56,41 @@ export default function SendPage() {
   const cancel = useMutation(trpc.dispatch.cancelSchedule.mutationOptions({ onSuccess: () => { toast.success("Schedule stopped, back to draft"); refresh(); } }));
   const sendNow = useMutation(trpc.dispatch.sendNow.mutationOptions({ onSuccess: () => { toast.success("Sending has started"); refresh(); } }));
   const test = useMutation(trpc.dispatch.sendTest.mutationOptions({ onSuccess: ({ to }) => { toast.success(`Test sent to ${to}`); refresh(); } }));
+  const testAddress = testTo.trim();
+  const testAddressValid = !testAddress || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(testAddress);
+  const sendTest = () => {
+    if (!testAddressValid) return toast.error("That test address doesn't look right");
+    test.mutate({ id, to: testAddress || undefined });
+  };
 
   if (pre.isLoading || !pre.data) return <Loading />;
-  const { issue, audience, settings, analysis, recent, canSend } = pre.data;
+  const { issue, audience, settings, analysis, recent, canSend, adminEmail, previewText } = pre.data;
   const siteLinks = analysis.links.length;
   const scheduledAt = when ? new Date(when) : null;
+  // The server refuses anything inside the one-minute cancel window.
+  const tooSoon = Boolean(scheduledAt && scheduledAt.getTime() < Date.now() + 60_000);
+  const testedAfterEdit = Boolean(issue.lastTestAt && new Date(issue.lastTestAt) >= new Date(issue.updatedAt));
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const checks = [
     { k: "AUDIENCE", v: `Everyone on the list: ${num(audience)} ${audience === 1 ? "person" : "people"}`, ok: audience > 0, action: { label: "Change", href: "/subscribers" } },
     { k: "SUBJECT", v: issue.subject, ok: issue.subject.trim().length > 0 && issue.subject.length <= 50, action: { label: "Edit", href: `/issues/${id}/edit` } },
-    { k: "PREVIEW TEXT", v: issue.previewText || "Missing: inboxes will show the first line instead", ok: Boolean(issue.previewText), action: { label: "Edit", href: `/issues/${id}/edit` } },
-    { k: "TEST SENT", v: issue.lastTestAt ? `To ${issue.lastTestTo}, ${ago(issue.lastTestAt)}` : "No test yet this draft", ok: Boolean(issue.lastTestAt && new Date(issue.lastTestAt) >= new Date(issue.updatedAt)), action: { label: issue.lastTestAt ? "Resend" : "Send", onClick: () => test.mutate({ id }) } },
+    {
+      k: "PREVIEW TEXT",
+      v: issue.previewText ? issue.previewText : previewText ? `Auto, from the opening: “${previewText}”` : "Missing: write an opening paragraph or set preview text",
+      ok: Boolean(previewText),
+      action: { label: "Edit", href: `/issues/${id}/edit` },
+    },
+    {
+      k: "TEST SENT",
+      v: !issue.lastTestAt
+        ? "No test yet this draft"
+        : testedAfterEdit
+          ? `To ${issue.lastTestTo}, ${ago(issue.lastTestAt)}`
+          : `Edited since the last test (to ${issue.lastTestTo}, ${ago(issue.lastTestAt)})`,
+      ok: testedAfterEdit,
+      action: { label: issue.lastTestAt ? "Resend" : "Send", onClick: sendTest },
+    },
     { k: "LINKS", v: siteLinks ? `${siteLinks} link${siteLinks === 1 ? "" : "s"}: ${analysis.links.slice(0, 2).join(", ")}` : "No links", ok: siteLinks > 0, action: { label: "Check", href: `/issues/${id}/edit` } },
     { k: "THE PITCH", v: analysis.pitchPresent ? "Present: a link back to the site" : "Missing: nothing links back to the site", ok: analysis.pitchPresent, action: { label: "Read", href: `/issues/${id}/edit` } },
   ];
@@ -160,8 +185,11 @@ export default function SendPage() {
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="text-base text-bone">Schedule for {scheduledAt ? dateTime(scheduledAt) : "…"}</span>
                     <span className="text-[13px] text-stone-muted">
-                      Your usual slot is {WEEKDAYS[settings.usualSlotDay]} at {settings.usualSlotTime}, your time.
+                      Your usual slot is {WEEKDAYS[settings.usualSlotDay]} at {settings.usualSlotTime}, your time ({timeZone}).
                     </span>
+                    {mode === "schedule" && tooSoon ? (
+                      <span className="text-[13px] text-[#e0a294]">That is in the past or under a minute away. Pick a later time, or send immediately.</span>
+                    ) : null}
                   </span>
                   <input
                     type="datetime-local"
@@ -187,8 +215,8 @@ export default function SendPage() {
                     variant="ember"
                     size="lg"
                     pending={schedule.isPending}
-                    disabled={!scheduledAt}
-                    onClick={() => scheduledAt && schedule.mutate({ id, at: scheduledAt })}
+                    disabled={!scheduledAt || tooSoon}
+                    onClick={() => scheduledAt && !tooSoon && schedule.mutate({ id, at: scheduledAt })}
                   >
                     <Icon icon={Timer02Icon} size={17} />
                     Schedule this issue
@@ -198,21 +226,37 @@ export default function SendPage() {
                     variant="ember"
                     size="lg"
                     pending={sendNow.isPending}
-                    disabled={!canSend}
+                    disabled={!canSend || audience === 0}
                     onClick={() => {
-                      if (window.confirm(`Send “${issue.subject}” to ${audience} people now? There is no recall.`)) sendNow.mutate({ id });
+                      const warn = testedAfterEdit ? "" : "\n\nYou haven't sent a test of this version yet.";
+                      if (window.confirm(`Send “${issue.subject}” to ${num(audience)} ${audience === 1 ? "person" : "people"} now? There is no recall.${warn}`)) sendNow.mutate({ id });
                     }}
                   >
                     <Icon icon={SentIcon} size={17} />
                     Send it now
                   </Button>
                 )}
-                <Button size="lg" className="rounded-full px-6" pending={test.isPending} disabled={!canSend} onClick={() => test.mutate({ id })}>
-                  <Icon icon={MailSend01Icon} size={16} />
-                  Send one more test
-                </Button>
+                <span className="flex items-center gap-2">
+                  <Button size="lg" className="rounded-full px-6" pending={test.isPending} disabled={!canSend || !testAddressValid} onClick={sendTest}>
+                    <Icon icon={MailSend01Icon} size={16} />
+                    Send one more test
+                  </Button>
+                  <input
+                    type="email"
+                    value={testTo}
+                    onChange={(e) => setTestTo(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && canSend && sendTest()}
+                    placeholder={adminEmail}
+                    aria-label="Send the test to"
+                    className={cn(
+                      "h-[38px] w-[220px] rounded-[9px] border bg-transparent px-3 text-[13px] text-bone outline-none placeholder:text-slate",
+                      testAddressValid ? "border-white/18" : "border-[#e0a294]/60",
+                    )}
+                  />
+                </span>
                 <Link href={`/issues/${id}/edit`} className="text-sm text-ash underline underline-offset-[3px] hover:text-bone sm:ml-auto">Back to the editor</Link>
                 {!canSend ? <span className="w-full text-[13px] text-[#e0a294]">SMTP is not configured on the server, so nothing can be sent.</span> : null}
+                {canSend && audience === 0 ? <span className="w-full text-[13px] text-[#e0a294]">Nobody is on the list yet, so there is no one to send to.</span> : null}
               </div>
             ) : null}
           </>
@@ -231,7 +275,7 @@ export default function SendPage() {
               <span className="font-mono text-[10px] text-stone">{status === "SCHEDULED" ? time(issue.scheduledFor!).toUpperCase() : arrival}</span>
             </span>
             <span className="truncate text-sm text-bone">{issue.subject}</span>
-            <span className="text-[13px] leading-[1.4] text-ash text-pretty">{issue.previewText || "No preview text set."}</span>
+            <span className="line-clamp-2 text-[13px] leading-[1.4] text-ash text-pretty">{previewText || "No preview text set."}</span>
           </span>
         </div>
 

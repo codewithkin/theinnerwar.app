@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { analyzeBody, subjectVerdict } from "./analyze";
+import { analyzeBody, derivePreviewText, effectivePreviewText, subjectVerdict, titleOf } from "./analyze";
 import { domainOf, isHardBounce } from "./deliverability";
 import { createRateLimiter } from "./rate-limit";
 import { median, rangeStart, toCsv } from "./reports";
@@ -102,6 +102,29 @@ describe("analyzeBody", () => {
     expect(analyzeBody("Just words.", "https://innerwar.app").pitchPresent).toBe(false);
     expect(subjectVerdict("The hour you avoid")).toBe("GOOD");
     expect(subjectVerdict("x".repeat(60))).toBe("LONG");
+  });
+});
+
+describe("preview text", () => {
+  test("uses the opening paragraph, skipping the title, rules and the button", () => {
+    const body = "# The hour you avoid\n\n---\n\nEvery writer has **one**: the [hour](https://x.co) they *dodge*.\n\n[Start](https://innerwar.app)";
+    expect(derivePreviewText(body)).toBe("Every writer has one: the hour they dodge.");
+    expect(derivePreviewText("# Only a title")).toBe("");
+    expect(derivePreviewText("> A quote\n> over two lines")).toBe("A quote over two lines");
+  });
+
+  test("cuts long openings at a word", () => {
+    const out = derivePreviewText(`${"word ".repeat(60)}end`, 40);
+    expect(out.length).toBeLessThanOrEqual(41);
+    expect(out.endsWith("word…")).toBe(true);
+  });
+
+  test("typed preview text wins; the rendered email falls back to the opening", () => {
+    expect(effectivePreviewText("  Typed  ", "Body text.")).toBe("Typed");
+    expect(effectivePreviewText(null, "# T\n\nBody text.")).toBe("Body text.");
+    const { html } = renderEmail({ label: "L", subject: "S", body: "# T\n\nThe opening line.", footer: "{{ unsubscribe_url }}", unsubscribeUrl: "u" });
+    expect(html).toMatch(/display:none[^>]*>The opening line\./);
+    expect(titleOf("intro\n# The *hour*\n\ntext")).toBe("The hour");
   });
 });
 

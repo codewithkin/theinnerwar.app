@@ -1,5 +1,7 @@
 import { Marked, type Tokens } from "marked";
 
+import { effectivePreviewText } from "./analyze";
+
 // Email HTML for "The Inner War" letters, after the live preview in Dispatch
 // (designs/Newsletter N3): a 600px bone-paper column, Newsreader body, an ember
 // rule on quotes, and a solid ember button for a link that stands alone.
@@ -121,8 +123,10 @@ export function renderEmail(input: RenderInput) {
     `font-family:${SANS};font-size:12px;line-height:1.6;color:${C.meta};`,
   );
 
-  const preheader = input.previewText
-    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(input.previewText)}${"&#847; &zwnj; &nbsp; ".repeat(30)}</div>`
+  // Without preview text, inboxes would show the label line; use the opening paragraph instead.
+  const previewText = effectivePreviewText(input.previewText, input.body);
+  const preheader = previewText
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(previewText)}${"&#847; &zwnj; &nbsp; ".repeat(30)}</div>`
     : "";
   const pixel = input.openPixelUrl
     ? `<img src="${escapeHtml(input.openPixelUrl)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;">`

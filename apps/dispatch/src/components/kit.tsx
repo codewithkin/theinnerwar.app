@@ -152,11 +152,28 @@ export function Bar({ value, color = "rgba(226,112,31,0.42)", height = 6, classN
   );
 }
 
-export function PageHeader({ title, meta, actions, back }: { title: ReactNode; meta?: ReactNode; actions?: ReactNode; back?: string }) {
+export function PageHeader({
+  title,
+  meta,
+  actions,
+  back,
+  onBack,
+}: {
+  title: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  back?: string;
+  /** Replaces the back link, e.g. to save before leaving. */
+  onBack?: () => void;
+}) {
   return (
     <header className="sticky top-0 z-10 flex min-h-[62px] flex-none flex-wrap items-center justify-between gap-3 border-b border-white/8 bg-charcoal/95 px-5 py-3 backdrop-blur lg:px-7">
       <span className="flex min-w-0 items-center gap-4">
-        {back ? (
+        {onBack ? (
+          <button type="button" onClick={onBack} aria-label="Back" className="flex size-8 flex-none items-center justify-center rounded-[9px] border border-white/14 text-parchment hover:border-white/25">
+            <Icon icon={ArrowLeft01Icon} size={16} />
+          </button>
+        ) : back ? (
           <Link href={back} aria-label="Back" className="flex size-8 flex-none items-center justify-center rounded-[9px] border border-white/14 text-parchment hover:border-white/25">
             <Icon icon={ArrowLeft01Icon} size={16} />
           </Link>

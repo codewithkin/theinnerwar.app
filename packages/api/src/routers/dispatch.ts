@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 
 import { publicProcedure, router, t } from "../index";
-import { analyzeBody } from "../newsletter/analyze";
+import { analyzeBody, effectivePreviewText } from "../newsletter/analyze";
 import {
   BroadcastError,
   audienceCount,
@@ -428,7 +428,11 @@ export const dispatchRouter = router({
       if (issue.kind === "BROADCAST" && issue.status !== "DRAFT") {
         throw new TRPCError({ code: "CONFLICT", message: "Only drafts can be edited" });
       }
-      return ctx.db.issue.update({ where: { id }, data });
+      // An unchanged save keeps updatedAt, so a test sent after the last real edit still counts.
+      const unchanged =
+        issue.subject === data.subject && (issue.previewText ?? null) === (data.previewText || null) && issue.body === data.body;
+      if (unchanged) return issue;
+      return ctx.db.issue.update({ where: { id }, data: { ...data, previewText: data.previewText || null } });
     }),
 
   deleteDraft: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
@@ -452,7 +456,12 @@ export const dispatchRouter = router({
         log.error("test send failed", { issueId: input.id, error });
         throw error;
       });
-      await ctx.db.issue.update({ where: { id: input.id }, data: { lastTestAt: new Date(), lastTestTo: to } });
+      // Keep updatedAt as the last content edit; the preflight compares it with lastTestAt.
+      const issue = await ctx.db.issue.findUniqueOrThrow({ where: { id: input.id }, select: { updatedAt: true } });
+      await ctx.db.issue.update({
+        where: { id: input.id },
+        data: { lastTestAt: new Date(), lastTestTo: to, updatedAt: issue.updatedAt },
+      });
       return { to };
     }),
 
@@ -476,8 +485,11 @@ export const dispatchRouter = router({
       issue,
       audience,
       settings,
+      adminEmail: ctx.adminEmail,
       canSend: ctx.newsletter.mailer.enabled,
       analysis,
+      /** What inboxes will show after the subject: typed, or the opening paragraph. */
+      previewText: effectivePreviewText(issue.previewText, issue.body),
       recent: recent.map((r) => {
         const s = stats.get(r.id)!;
         return { ...r, openRate: pct(s.opened, s.sent), signups: s.signups };

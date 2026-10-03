@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ComputerIcon,
+  FloppyDiskIcon,
   MailSend01Icon,
   Moon02Icon,
   Note03Icon,
@@ -10,7 +11,7 @@ import {
   SmartPhone01Icon,
   TextFontIcon,
 } from "@hugeicons/core-free-icons";
-import { subjectVerdict } from "@theinnerwar.app/api/newsletter/analyze";
+import { derivePreviewText, previewVerdict, subjectVerdict, titleOf } from "@theinnerwar.app/api/newsletter/analyze";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -22,6 +23,10 @@ import { ago } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 
 type View = "desktop" | "mobile" | "dark";
+type Draft = { subject: string; previewText: string; body: string };
+
+/** The subject a new issue starts with; it follows the `# Heading` until it is changed by hand. */
+const UNTITLED = "Untitled issue";
 
 function useDebounced<T>(value: T, ms: number) {
   const [debounced, setDebounced] = useState(value);
@@ -31,6 +36,8 @@ function useDebounced<T>(value: T, ms: number) {
   }, [value, ms]);
   return debounced;
 }
+
+const same = (a: Draft, b: Draft) => a.subject === b.subject && a.previewText === b.previewText && a.body === b.body;
 
 // N3 · Editor: markdown left, the real email right.
 export default function EditorPage() {
@@ -42,6 +49,8 @@ export default function EditorPage() {
   const [subject, setSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
   const [body, setBody] = useState("");
+  /** The content as last stored on the server; "dirty" is anything different. */
+  const [saved, setSaved] = useState<Draft | null>(null);
   const [mode, setMode] = useState<"write" | "plain">("write");
   const [view, setView] = useState<View>("desktop");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -52,9 +61,11 @@ export default function EditorPage() {
   useEffect(() => {
     if (issue.data && !loaded.current) {
       loaded.current = true;
-      setSubject(issue.data.subject);
-      setPreviewText(issue.data.previewText ?? "");
-      setBody(issue.data.body);
+      const d = { subject: issue.data.subject, previewText: issue.data.previewText ?? "", body: issue.data.body };
+      setSubject(d.subject);
+      setPreviewText(d.previewText);
+      setBody(d.body);
+      setSaved(d);
       setSavedAt(new Date(issue.data.updatedAt));
     }
   }, [issue.data]);
@@ -66,28 +77,79 @@ export default function EditorPage() {
   }, []);
 
   const editable = issue.data ? issue.data.kind === "WELCOME" || issue.data.status === "DRAFT" : false;
-  const draft = { subject, previewText, body };
-  const debounced = useDebounced(draft, 700);
+  const draft: Draft = { subject, previewText, body };
+  const dirty = saved !== null && !same(draft, saved);
+  // Debounce a string so an unchanged draft never looks new (objects differ every render).
+  const debouncedKey = useDebounced(JSON.stringify(draft), 700);
+  const debounced = JSON.parse(debouncedKey) as Draft;
 
   const save = useMutation(
     trpc.dispatch.saveIssue.mutationOptions({
-      onSuccess: (saved) => {
-        setSavedAt(new Date(saved.updatedAt));
+      onSuccess: (stored, vars) => {
+        setSaved({ subject: vars.subject, previewText: vars.previewText ?? "", body: vars.body });
+        setSavedAt(new Date(stored.updatedAt));
+        queryClient.setQueryData(trpc.dispatch.issue.queryKey({ id }), stored);
         queryClient.invalidateQueries({ queryKey: trpc.dispatch.issues.queryKey() });
       },
     }),
   );
 
-  // Autosave after typing pauses.
+  const persist = (d: Draft) => save.mutateAsync({ id, subject: d.subject, previewText: d.previewText || null, body: d.body });
+
+  /** Saves now if anything changed; false when there is nothing valid to save. */
+  const flush = async () => {
+    if (!editable || !dirty) return true;
+    if (!subject.trim()) {
+      toast.error("Add a subject before saving");
+      return false;
+    }
+    try {
+      await persist(draft);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Autosave after typing pauses, and again once an in-flight save settles if more changed.
   useEffect(() => {
-    if (!loaded.current || !editable || !issue.data) return;
-    const d = debounced;
-    if (d.subject === issue.data.subject && (d.previewText || "") === (issue.data.previewText ?? "") && d.body === issue.data.body && !save.data) return;
-    if (!d.subject.trim()) return;
-    console.debug("[dispatch] autosave", { id, chars: d.body.length });
-    save.mutate({ id, subject: d.subject, previewText: d.previewText || null, body: d.body });
+    if (!loaded.current || !editable || !saved || save.isPending) return;
+    if (same(debounced, saved) || !debounced.subject.trim()) return;
+    // Don't retry a failed save of the same content in a loop; the next edit or Save tries again.
+    const failed = save.isError ? save.variables : undefined;
+    if (failed && same(debounced, { subject: failed.subject, previewText: failed.previewText ?? "", body: failed.body })) return;
+    console.debug("[dispatch] autosave", { id, chars: debounced.body.length });
+    persist(debounced).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debounced]);
+  }, [debouncedKey, save.isPending, saved]);
+
+  const saveNow = () => flush().then((ok) => ok && toast.success("Saved", { id: "dispatch-save", duration: 1200 }));
+
+  // Ctrl/⌘+S saves instead of opening the browser's "Save page" dialog.
+  const shortcut = useRef<() => void>(() => {});
+  useEffect(() => {
+    shortcut.current = () => {
+      if (editable) void saveNow();
+    };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        shortcut.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Warn before closing or reloading the tab with unsaved changes.
+  useEffect(() => {
+    if (!dirty) return;
+    const onUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, [dirty]);
 
   const preview = useQuery({
     ...trpc.dispatch.preview.queryOptions({ id, subject: debounced.subject, previewText: debounced.previewText || null, body: debounced.body }),
@@ -106,29 +168,41 @@ export default function EditorPage() {
   const welcome = i.kind === "WELCOME";
   const label = welcome ? "Welcome email" : `Issue ${i.number ?? "draft"}`;
   const verdict = subjectVerdict(subject);
+  const autoPreview = derivePreviewText(body);
+  const previewHint = previewText.trim() ? previewVerdict(previewText) : null;
   const analysis = preview.data?.analysis;
   const lines = body.split("\n").length;
-  const dirty = subject !== debounced.subject || body !== debounced.body || previewText !== debounced.previewText;
 
   const status = !editable
     ? `${i.status} · READ ONLY`
-    : save.isPending || dirty
+    : save.isPending
       ? "SAVING…"
-      : save.isError
+      : save.isError && dirty
         ? "NOT SAVED"
-        : `${welcome ? "ALWAYS ON" : "DRAFT"} · SAVED ${savedAt ? ago(savedAt).toUpperCase() : ""}`;
+        : dirty
+          ? "UNSAVED CHANGES"
+          : `${welcome ? "ALWAYS ON" : "DRAFT"} · SAVED ${savedAt ? ago(savedAt).toUpperCase() : ""}`;
 
   const flushAndGo = async (href: string) => {
-    if (editable && dirty) await save.mutateAsync({ id, subject, previewText: previewText || null, body });
-    router.push(href);
+    if (await flush()) router.push(href);
+  };
+
+  // While the subject still matches the title (or is the placeholder), retitling the issue renames it too.
+  const onBodyChange = (next: string) => {
+    const before = titleOf(body);
+    const after = titleOf(next);
+    if (editable && after && after !== before && (subject.trim() === UNTITLED || (before !== null && subject.trim() === before))) {
+      setSubject(after);
+    }
+    setBody(next);
   };
 
   return (
     <div className="flex h-svh flex-col">
       <PageHeader
-        back="/issues"
+        onBack={() => flushAndGo("/issues")}
         title={`${label} · ${subject || "Untitled"}`}
-        meta={<span className={cn(save.isError && "text-[#e0a294]")}>{status}</span>}
+        meta={<span className={cn(save.isError && dirty && "text-[#e0a294]", dirty && !save.isPending && !save.isError && "text-ember-pale")}>{status}</span>}
         actions={
           <>
             <span className="flex gap-1.5">
@@ -140,11 +214,22 @@ export default function EditorPage() {
               ))}
             </span>
             <span className="hidden h-[22px] w-px bg-white/12 sm:block" />
+            {editable ? (
+              <Button
+                variant="outline"
+                title="Save (Ctrl+S)"
+                pending={save.isPending}
+                disabled={!dirty}
+                onClick={saveNow}
+              >
+                {save.isPending ? null : <Icon icon={FloppyDiskIcon} size={14} />}
+                {dirty || save.isPending ? "Save" : "Saved"}
+              </Button>
+            ) : null}
             <Button
               pending={test.isPending}
               onClick={async () => {
-                if (editable && dirty) await save.mutateAsync({ id, subject, previewText: previewText || null, body });
-                test.mutate({ id });
+                if (await flush()) test.mutate({ id });
               }}
             >
               <Icon icon={MailSend01Icon} size={14} />
@@ -153,7 +238,7 @@ export default function EditorPage() {
             {welcome ? (
               <ButtonLink href={`/issues/${id}`} variant="outline">Report</ButtonLink>
             ) : editable ? (
-              <Button variant="ember" onClick={() => flushAndGo(`/issues/${id}/send`)}>
+              <Button variant="ember" disabled={!subject.trim()} onClick={() => flushAndGo(`/issues/${id}/send`)}>
                 Continue to send
                 <Icon icon={SentIcon} size={14} />
               </Button>
@@ -172,8 +257,9 @@ export default function EditorPage() {
               <input
                 value={subject}
                 readOnly={!editable}
+                placeholder="What the inbox shows in bold"
                 onChange={(e) => setSubject(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-[15px] text-bone outline-none"
+                className="min-w-0 flex-1 bg-transparent text-[15px] text-bone outline-none placeholder:text-slate"
               />
               <span className={cn("flex-none font-mono text-[10px]", verdict === "GOOD" ? "text-[#8fb894]" : "text-ember-pale")}>
                 {subject.trim().length} CHARS · {verdict}
@@ -184,10 +270,22 @@ export default function EditorPage() {
               <input
                 value={previewText}
                 readOnly={!editable}
-                placeholder="The line inboxes show after the subject"
+                placeholder={autoPreview || "The line inboxes show after the subject"}
+                title={previewText ? undefined : "Left blank, inboxes show the opening paragraph"}
                 onChange={(e) => setPreviewText(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm text-stone-muted outline-none placeholder:text-slate"
+                className="min-w-0 flex-1 bg-transparent text-sm text-stone-muted outline-none placeholder:text-slate placeholder:italic"
               />
+              {previewHint ? (
+                <span className={cn("flex-none font-mono text-[10px]", previewHint === "GOOD" ? "text-[#8fb894]" : "text-ember-pale")}>
+                  {previewText.trim().length} CHARS · {previewHint}
+                </span>
+              ) : autoPreview ? (
+                <span className="flex-none font-mono text-[10px] text-stone" title="Left blank, inboxes show the opening paragraph">
+                  AUTO · FROM OPENING
+                </span>
+              ) : (
+                <span className="flex-none font-mono text-[10px] text-ember-pale">EMPTY</span>
+              )}
             </label>
           </div>
 
@@ -202,7 +300,7 @@ export default function EditorPage() {
                 value={body}
                 readOnly={!editable}
                 spellCheck
-                onChange={(e) => setBody(e.target.value)}
+                onChange={(e) => onBodyChange(e.target.value)}
                 onScroll={(e) => {
                   if (gutter.current) gutter.current.scrollTop = e.currentTarget.scrollTop;
                 }}
