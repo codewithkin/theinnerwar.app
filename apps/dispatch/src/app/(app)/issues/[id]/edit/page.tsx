@@ -8,6 +8,7 @@ import {
   Moon02Icon,
   Note03Icon,
   SentIcon,
+  SidebarRight01Icon,
   SmartPhone01Icon,
   TextFontIcon,
 } from "@hugeicons/core-free-icons";
@@ -27,6 +28,9 @@ type Draft = { subject: string; previewText: string; body: string };
 
 /** The subject a new issue starts with; it follows the `# Heading` until it is changed by hand. */
 const UNTITLED = "Untitled issue";
+const FOCUS_KEY = "dispatch.editor.focus";
+/** In the writing view, the text sits in a centred ~820px column while the whole width still scrolls. */
+const column = "px-[max(26px,calc((100%_-_820px)/2))]";
 
 function useDebounced<T>(value: T, ms: number) {
   const [debounced, setDebounced] = useState(value);
@@ -53,6 +57,8 @@ export default function EditorPage() {
   const [saved, setSaved] = useState<Draft | null>(null);
   const [mode, setMode] = useState<"write" | "plain">("write");
   const [view, setView] = useState<View>("desktop");
+  /** Writing view: the preview hidden and the editor full width. Remembered per browser. */
+  const [focus, setFocus] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [, tick] = useState(0);
   const loaded = useRef(false);
@@ -69,6 +75,19 @@ export default function EditorPage() {
       setSavedAt(new Date(issue.data.updatedAt));
     }
   }, [issue.data]);
+
+  useEffect(() => {
+    try {
+      setFocus(window.localStorage.getItem(FOCUS_KEY) === "1");
+    } catch {}
+  }, []);
+  const toggleFocus = () =>
+    setFocus((f) => {
+      try {
+        window.localStorage.setItem(FOCUS_KEY, f ? "0" : "1");
+      } catch {}
+      return !f;
+    });
 
   // Keeps "SAVED 4 SEC AGO" current.
   useEffect(() => {
@@ -125,7 +144,7 @@ export default function EditorPage() {
 
   const saveNow = () => flush().then((ok) => ok && toast.success("Saved", { id: "dispatch-save", duration: 1200 }));
 
-  // Ctrl/⌘+S saves instead of opening the browser's "Save page" dialog.
+  // Ctrl/⌘+S saves instead of opening the browser's "Save page" dialog; Ctrl/⌘+\ toggles the writing view.
   const shortcut = useRef<() => void>(() => {});
   useEffect(() => {
     shortcut.current = () => {
@@ -134,9 +153,13 @@ export default function EditorPage() {
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key.toLowerCase() === "s") {
         e.preventDefault();
         shortcut.current();
+      } else if (e.key === "\\") {
+        e.preventDefault();
+        toggleFocus();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -212,6 +235,15 @@ export default function EditorPage() {
                   {m === "write" ? "Write" : "Plain text"}
                 </Button>
               ))}
+              <Button
+                variant={focus ? "soft" : "outline"}
+                title={`${focus ? "Show" : "Hide"} the live preview (Ctrl+\\)`}
+                aria-pressed={focus}
+                onClick={toggleFocus}
+              >
+                <Icon icon={SidebarRight01Icon} size={14} />
+                {focus ? "Show preview" : "Writing view"}
+              </Button>
             </span>
             <span className="hidden h-[22px] w-px bg-white/12 sm:block" />
             {editable ? (
@@ -250,8 +282,8 @@ export default function EditorPage() {
       />
 
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-        <section className="flex min-h-[520px] flex-col border-white/8 xl:w-[640px] xl:flex-none xl:border-r">
-          <div className="flex flex-none flex-col gap-2.5 border-b border-white/7 px-[26px] pt-5 pb-3.5">
+        <section className={cn("flex min-h-[520px] flex-col border-white/8", focus ? "flex-1" : "xl:w-[640px] xl:flex-none xl:border-r")}>
+          <div className={cn("flex flex-none flex-col gap-2.5 border-b border-white/7 px-[26px] pt-5 pb-3.5", focus && column)}>
             <label className="flex items-center gap-3">
               <Mono className="w-[58px] flex-none text-[9px] tracking-[0.14em] text-stone">SUBJECT</Mono>
               <input
@@ -290,7 +322,7 @@ export default function EditorPage() {
           </div>
 
           {mode === "write" ? (
-            <div className="flex min-h-0 flex-1 overflow-hidden">
+            <div className={cn("flex min-h-0 flex-1 overflow-hidden", focus && column)}>
               <div ref={gutter} aria-hidden="true" className="flex-none overflow-hidden py-5 pr-2 pl-[26px] text-right select-none">
                 {Array.from({ length: lines }, (_, n) => (
                   <span key={n} className="block w-5 font-mono text-xs leading-[21px] text-[#3f3a34]">{n + 1}</span>
@@ -308,12 +340,12 @@ export default function EditorPage() {
               />
             </div>
           ) : (
-            <pre className="min-h-0 flex-1 overflow-auto px-[26px] py-5 font-mono text-[13px] leading-[21px] whitespace-pre-wrap text-parchment">
+            <pre className={cn("min-h-0 flex-1 overflow-auto px-[26px] py-5 font-mono text-[13px] leading-[21px] whitespace-pre-wrap text-parchment", focus && column)}>
               {preview.data?.text ?? ""}
             </pre>
           )}
 
-          <div className="flex h-10 flex-none items-center gap-5 border-t border-white/7 px-[26px] font-mono text-[10px] text-stone">
+          <div className={cn("flex h-10 flex-none items-center gap-5 border-t border-white/7 px-[26px] font-mono text-[10px] text-stone", focus && column)}>
             <span>{analysis?.words ?? 0} WORDS</span>
             <span>~{analysis?.readMinutes ?? 1} MIN READ</span>
             <span>{analysis?.links.length ?? 0} LINK{analysis?.links.length === 1 ? "" : "S"}</span>
@@ -323,7 +355,7 @@ export default function EditorPage() {
           </div>
         </section>
 
-        <section className="flex min-h-[640px] min-w-0 flex-1 flex-col bg-[#0d0c0b]">
+        <section className={cn("flex min-h-[640px] min-w-0 flex-1 flex-col bg-[#0d0c0b]", focus && "hidden")}>
           <div className="flex h-[46px] flex-none items-center justify-between border-b border-white/7 px-6">
             <Mono className="text-[9px] text-stone">LIVE PREVIEW</Mono>
             <span className="flex gap-2">

@@ -1,15 +1,24 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
-import { Mail01Icon, MailOpen01Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
+import {
+  Copy01Icon,
+  Delete02Icon,
+  Mail01Icon,
+  MailOpen01Icon,
+  PencilEdit02Icon,
+  SentIcon,
+  Timer02Icon,
+} from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { ButtonLink, Empty, Flame, GREEN, Loading, PageHeader, Segmented, StatusPill } from "@/components/kit";
 import { Icon } from "@/components/icon";
 import { WriteIssueButton } from "@/components/write-issue";
-import { dateTime, day, num, pct } from "@/lib/format";
+import { dateTime, day, nextSlot, num, pct } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 
 type Filter = "all" | "sent" | "scheduled" | "drafts";
@@ -26,6 +35,172 @@ function hrefFor(issue: { id: string; status: string }) {
   if (issue.status === "DRAFT") return `/issues/${issue.id}/edit`;
   if (issue.status === "SCHEDULED" || issue.status === "SENDING") return `/issues/${issue.id}/send`;
   return `/issues/${issue.id}`;
+}
+
+type Row = { id: string; status: string; subject: string; updatedAt: Date | string; lastTestAt: Date | string | null };
+
+const iconButton =
+  "flex size-8 items-center justify-center rounded-[8px] border border-transparent text-stone hover:border-white/14 hover:bg-white/5 hover:text-bone disabled:opacity-40";
+
+/** Duplicate, delete, and "Send" (usual slot or now) without opening the issue. */
+function RowActions({
+  issue,
+  audience,
+  canSend,
+  usualSlot,
+}: {
+  issue: Row;
+  audience: number;
+  canSend: boolean;
+  usualSlot: { day: number; time: string };
+}) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  // Viewport position of the open menu; fixed so the table's scroll box can't clip it.
+  const [menu, setMenu] = useState<{ top: number; right: number } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [menu]);
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: trpc.dispatch.issues.queryKey() });
+    queryClient.invalidateQueries({ queryKey: trpc.dispatch.shell.queryKey() });
+  };
+
+  const duplicate = useMutation(
+    trpc.dispatch.duplicateIssue.mutationOptions({
+      onSuccess: (copy) => {
+        refresh();
+        router.push(`/issues/${copy.id}/edit`);
+      },
+    }),
+  );
+  const remove = useMutation(
+    trpc.dispatch.deleteDraft.mutationOptions({
+      onSuccess: () => {
+        toast.success("Draft deleted");
+        refresh();
+      },
+    }),
+  );
+  const schedule = useMutation(
+    trpc.dispatch.schedule.mutationOptions({
+      onSuccess: (s) => {
+        toast.success(`Scheduled for ${dateTime(s.scheduledFor)}`);
+        refresh();
+      },
+    }),
+  );
+  const sendNow = useMutation(
+    trpc.dispatch.sendNow.mutationOptions({
+      onSuccess: () => {
+        toast.success("Sending has started");
+        refresh();
+      },
+    }),
+  );
+
+  const draft = issue.status === "DRAFT";
+  const slot = nextSlot(usualSlot.day, usualSlot.time);
+  const people = `${num(audience)} ${audience === 1 ? "person" : "people"}`;
+  const untested = !issue.lastTestAt || new Date(issue.lastTestAt) < new Date(issue.updatedAt);
+  const warn = untested ? "\n\nYou haven't sent a test of this version yet." : "";
+  const busy = duplicate.isPending || remove.isPending || schedule.isPending || sendNow.isPending;
+  const option = "flex items-start gap-2.5 rounded-[8px] px-3 py-2.5 text-left hover:bg-white/6";
+
+  return (
+    // Clicks in here must not open the row.
+    <span className="relative flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+      {draft ? (
+        <button
+          type="button"
+          title={!canSend ? "SMTP is not configured" : audience === 0 ? "Nobody is on the list yet" : "Send or schedule"}
+          aria-label="Send or schedule"
+          aria-expanded={Boolean(menu)}
+          disabled={busy || !canSend || audience === 0}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            // Open upward when there's no room below for the ~190px menu.
+            const top = r.bottom + 200 > window.innerHeight ? r.top - 196 : r.bottom + 4;
+            setMenu((m) => (m ? null : { top, right: window.innerWidth - r.right }));
+          }}
+          className={iconButton}
+        >
+          <Icon icon={SentIcon} size={15} />
+        </button>
+      ) : null}
+      <button type="button" title="Duplicate" aria-label="Duplicate" disabled={busy} onClick={() => duplicate.mutate({ id: issue.id })} className={iconButton}>
+        <Icon icon={Copy01Icon} size={15} />
+      </button>
+      {draft ? (
+        <button
+          type="button"
+          title="Delete draft"
+          aria-label="Delete draft"
+          disabled={busy}
+          onClick={() => {
+            if (window.confirm(`Delete the draft “${issue.subject}”? This can't be undone.`)) remove.mutate({ id: issue.id });
+          }}
+          className={cn(iconButton, "hover:text-[#e0a294]")}
+        >
+          <Icon icon={Delete02Icon} size={15} />
+        </button>
+      ) : null}
+
+      {menu ? (
+        <>
+          <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenu(null)} />
+          <span style={{ top: menu.top, right: menu.right }} className="fixed z-30 flex w-[260px] flex-col rounded-[12px] border border-white/12 bg-charcoal p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.5)]">
+            <button
+              type="button"
+              className={option}
+              onClick={() => {
+                setMenu(null);
+                if (window.confirm(`Schedule “${issue.subject}” for ${dateTime(slot)} to ${people}?${warn}`)) {
+                  schedule.mutate({ id: issue.id, at: slot });
+                }
+              }}
+            >
+              <Icon icon={Timer02Icon} size={15} className="mt-0.5 flex-none text-ember-glow" />
+              <span className="flex flex-col gap-0.5">
+                <span className="text-sm text-bone">Usual slot</span>
+                <span className="font-mono text-[10px] text-stone">{dateTime(slot).toUpperCase()}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={option}
+              onClick={() => {
+                setMenu(null);
+                if (window.confirm(`Send “${issue.subject}” to ${people} now? There is no recall.${warn}`)) {
+                  sendNow.mutate({ id: issue.id });
+                }
+              }}
+            >
+              <Icon icon={SentIcon} size={15} className="mt-0.5 flex-none text-ember-glow" />
+              <span className="flex flex-col gap-0.5">
+                <span className="text-sm text-bone">Send now</span>
+                <span className="font-mono text-[10px] text-stone">TO {people.toUpperCase()}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="rounded-[8px] px-3 py-2 text-left text-[13px] text-ash hover:bg-white/6 hover:text-bone"
+              onClick={() => router.push(`/issues/${issue.id}/send`)}
+            >
+              Open the full checklist…
+            </button>
+          </span>
+        </>
+      ) : null}
+    </span>
+  );
 }
 
 // N2 · Issues: the welcome email pinned above the broadcasts.
@@ -105,7 +280,7 @@ export default function IssuesPage() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] border-collapse">
+              <table className="w-full min-w-[940px] border-collapse">
                 <thead>
                   <tr className="text-left font-mono text-[9px] tracking-[0.14em] text-slate">
                     <th className="w-[52px] px-5 pb-3 font-normal">NO.</th>
@@ -114,7 +289,8 @@ export default function IssuesPage() {
                     <th className="w-[96px] pb-3 text-right font-normal">SENT TO</th>
                     <th className="w-[88px] pb-3 text-right font-normal">OPENED</th>
                     <th className="w-[96px] pb-3 text-right font-normal">SIGNUPS</th>
-                    <th className="w-[130px] px-5 pb-3 text-right font-normal">DATE</th>
+                    <th className="w-[130px] pb-3 pl-5 text-right font-normal">DATE</th>
+                    <th className="w-[124px] px-4 pb-3 font-normal"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -137,8 +313,11 @@ export default function IssuesPage() {
                         <td className="py-[15px] text-right font-mono text-xs text-stone-muted">{sent || i.status === "SENDING" ? num(i.recipientCount ?? i.sent) : "—"}</td>
                         <td className="py-[15px] text-right font-mono text-xs text-stone-muted">{sent ? pct(i.openRate) : "—"}</td>
                         <td className="py-[15px] text-right font-mono text-xs" style={{ color: sent ? GREEN : "#6b6558" }}>{sent ? num(i.signups) : "—"}</td>
-                        <td className="px-5 py-[15px] text-right font-mono text-[11px] text-stone">
+                        <td className="py-[15px] pl-5 text-right font-mono text-[11px] text-stone">
                           {sent ? day(i.sentAt) : live ? dateTime(i.scheduledFor) : `Edited ${day(i.updatedAt)}`}
+                        </td>
+                        <td className="px-4 py-[9px]">
+                          <RowActions issue={i} audience={data.audience} canSend={data.canSend} usualSlot={data.usualSlot} />
                         </td>
                       </tr>
                     );

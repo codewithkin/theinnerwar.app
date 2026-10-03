@@ -392,16 +392,27 @@ export const dispatchRouter = router({
   // N2 · Issues, welcome pinned above the broadcasts.
   issues: adminProcedure.query(async ({ ctx }) => {
     const welcome = await ensureWelcomeIssue(ctx.db);
-    const broadcasts = await ctx.db.issue.findMany({
-      where: { kind: "BROADCAST" },
-      orderBy: [{ number: { sort: "desc", nulls: "first" } }, { updatedAt: "desc" }],
-    });
+    const [broadcasts, audience, settings] = await Promise.all([
+      ctx.db.issue.findMany({
+        where: { kind: "BROADCAST" },
+        orderBy: [{ number: { sort: "desc", nulls: "first" } }, { updatedAt: "desc" }],
+      }),
+      audienceCount(ctx.db),
+      getSettings(ctx.db),
+    ]);
     const stats = await issueStats(ctx.db, [welcome.id, ...broadcasts.map((b) => b.id)]);
     const withStats = <T extends { id: string }>(issue: T) => {
       const s = stats.get(issue.id)!;
       return { ...issue, ...s, openRate: pct(s.opened, s.sent), conversionRate: pct(s.signups, s.sent) };
     };
-    return { welcome: withStats(welcome), broadcasts: broadcasts.map(withStats) };
+    return {
+      welcome: withStats(welcome),
+      broadcasts: broadcasts.map(withStats),
+      // For "Send" straight from the list.
+      audience,
+      canSend: ctx.newsletter.mailer.enabled,
+      usualSlot: { day: settings.usualSlotDay, time: settings.usualSlotTime },
+    };
   }),
 
   issue: adminProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
@@ -434,6 +445,23 @@ export const dispatchRouter = router({
       if (unchanged) return issue;
       return ctx.db.issue.update({ where: { id }, data: { ...data, previewText: data.previewText || null } });
     }),
+
+  /** A new draft with another issue's subject, preview text and body. */
+  duplicateIssue: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    const source = await ctx.db.issue.findUnique({ where: { id: input.id } });
+    if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Issue not found" });
+    const copy = await ctx.db.issue.create({
+      data: {
+        kind: "BROADCAST",
+        status: "DRAFT",
+        subject: `${source.subject} (copy)`.slice(0, 200),
+        previewText: source.previewText,
+        body: source.body,
+      },
+    });
+    log.info("issue duplicated", { from: source.id, to: copy.id });
+    return copy;
+  }),
 
   deleteDraft: adminProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
     const { count } = await ctx.db.issue.deleteMany({
