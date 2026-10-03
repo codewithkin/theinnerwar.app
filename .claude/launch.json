@@ -1,0 +1,44 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "innerwar-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "web",
+        "exec",
+        "next",
+        "dev"
+      ],
+      "port": 3011,
+      "autoPort": true
+    },
+    {
+      "name": "innerwar-server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "server",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": false,
+      "env": {
+        "CORS_ORIGIN": "http://localhost:3011",
+        "DISPATCH_ORIGIN": "http://localhost:3002"
+      }
+    },
+    {
+      "name": "dispatch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "dispatch",
+        "start"
+      ],
+      "port": 3002,
+      "autoPort": false
+    }
+  ]
+}
