@@ -157,7 +157,7 @@ export default function EditorPage() {
       if (e.key.toLowerCase() === "s") {
         e.preventDefault();
         shortcut.current();
-      } else if (e.key === "\\") {
+      } else if (e.key === "\\" || e.code === "Backslash") {
         e.preventDefault();
         toggleFocus();
       }

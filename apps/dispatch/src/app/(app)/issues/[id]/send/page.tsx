@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { effectivePreviewText } from "@theinnerwar.app/api/newsletter/analyze";
 import { cn } from "@theinnerwar.app/ui/lib/utils";
 import {
   Alert02Icon,
@@ -64,7 +65,9 @@ export default function SendPage() {
   };
 
   if (pre.isLoading || !pre.data) return <Loading />;
-  const { issue, audience, settings, analysis, recent, canSend, adminEmail, previewText } = pre.data;
+  const { issue, audience, settings, analysis, recent, canSend, adminEmail } = pre.data;
+  // Computed here too, in case the API predates returning it.
+  const previewText = (pre.data.previewText as string | undefined) ?? effectivePreviewText(issue.previewText, issue.body);
   const siteLinks = analysis.links.length;
   const scheduledAt = when ? new Date(when) : null;
   // The server refuses anything inside the one-minute cancel window.

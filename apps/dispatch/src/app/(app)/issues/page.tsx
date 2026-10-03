@@ -50,9 +50,11 @@ function RowActions({
   usualSlot,
 }: {
   issue: Row;
-  audience: number;
-  canSend: boolean;
-  usualSlot: { day: number; time: string };
+  // Optional: an API deployed before quick-send doesn't return these, and the
+  // button then falls back to opening the full send page.
+  audience?: number;
+  canSend?: boolean;
+  usualSlot?: { day: number; time: string };
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -107,7 +109,8 @@ function RowActions({
   );
 
   const draft = issue.status === "DRAFT";
-  const slot = nextSlot(usualSlot.day, usualSlot.time);
+  const quick = usualSlot !== undefined && audience !== undefined && canSend !== undefined;
+  const slot = usualSlot ? nextSlot(usualSlot.day, usualSlot.time) : null;
   const people = `${num(audience)} ${audience === 1 ? "person" : "people"}`;
   const untested = !issue.lastTestAt || new Date(issue.lastTestAt) < new Date(issue.updatedAt);
   const warn = untested ? "\n\nYou haven't sent a test of this version yet." : "";
@@ -120,11 +123,12 @@ function RowActions({
       {draft ? (
         <button
           type="button"
-          title={!canSend ? "SMTP is not configured" : audience === 0 ? "Nobody is on the list yet" : "Send or schedule"}
+          title={!quick ? "Send or schedule" : !canSend ? "SMTP is not configured" : audience === 0 ? "Nobody is on the list yet" : "Send or schedule"}
           aria-label="Send or schedule"
           aria-expanded={Boolean(menu)}
-          disabled={busy || !canSend || audience === 0}
+          disabled={busy || (quick && (!canSend || audience === 0))}
           onClick={(e) => {
+            if (!quick) return router.push(`/issues/${issue.id}/send`);
             const r = e.currentTarget.getBoundingClientRect();
             // Open upward when there's no room below for the ~190px menu.
             const top = r.bottom + 200 > window.innerHeight ? r.top - 196 : r.bottom + 4;
@@ -153,7 +157,7 @@ function RowActions({
         </button>
       ) : null}
 
-      {menu ? (
+      {menu && slot ? (
         <>
           <button type="button" aria-label="Close menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenu(null)} />
           <span style={{ top: menu.top, right: menu.right }} className="fixed z-30 flex w-[260px] flex-col rounded-[12px] border border-white/12 bg-charcoal p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.5)]">
