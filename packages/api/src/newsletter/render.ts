@@ -2,15 +2,11 @@ import { Marked, type Tokens } from "marked";
 
 import { effectivePreviewText } from "./analyze";
 
-// Email HTML for "The Inner War" letters, kept deliberately plain so it reads
-// (and filters) like a personal letter rather than a marketing email: no page
-// background, card, banner, button or web fonts, just text in the reader's own
-// system font, with ordinary underlined links. Gmail sends heavily designed
-// mail to Promotions; this is the trade-off.
-// Styles are inline because most mail clients drop <style> blocks.
-
-const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
-const P = "margin:0 0 16px;";
+// Email HTML for "The Inner War" letters: bare HTML with no styling of our own,
+// so it looks like a normal email typed in Gmail and the mail client applies
+// its own font, colours and dark mode. No background, colours, fonts, boxes,
+// borders or buttons. Headings, bold, italics, quotes, lists and links keep
+// their meaning through plain tags. Gmail sends designed mail to Promotions.
 
 export function escapeHtml(value: string) {
   return value
@@ -26,7 +22,7 @@ export type RenderInput = {
   label: string;
   subject: string;
   previewText?: string | null;
-  /** Markdown. A leading `# Heading` is shown as a plain bold title. */
+  /** Markdown. A leading `# Heading` becomes the title. */
   body: string;
   /** Footer markdown; `{{ unsubscribe_url }}` is replaced with `unsubscribeUrl`. */
   footer: string;
@@ -37,29 +33,28 @@ export type RenderInput = {
   openPixelUrl?: string;
 };
 
-function createMarked(trackLink: (url: string) => string, paragraphStyle = P) {
+function createMarked(trackLink: (url: string) => string) {
   return new Marked({
     async: false,
     gfm: true,
     renderer: {
       heading({ tokens, depth }: Tokens.Heading) {
-        const size = depth === 1 ? 22 : depth === 2 ? 19 : 17;
-        return `<h${depth} style="margin:0 0 16px;font-size:${size}px;line-height:1.3;font-weight:bold;">${this.parser.parseInline(tokens)}</h${depth}>`;
+        return `<h${depth}>${this.parser.parseInline(tokens)}</h${depth}>`;
       },
       // A link on its own line stays an ordinary link: buttons read as marketing.
       paragraph({ tokens }: Tokens.Paragraph) {
-        return `<p style="${paragraphStyle}">${this.parser.parseInline(tokens)}</p>`;
+        return `<p>${this.parser.parseInline(tokens)}</p>`;
       },
       blockquote({ tokens }: Tokens.Blockquote) {
         const inner = this.parser
           .parse(tokens)
-          .replace(/<p style="[^"]*">/g, "")
+          .replace(/<p>/g, "")
           .replace(/<\/p>/g, "<br>")
           .replace(/(<br>)+$/, "");
-        return `<blockquote style="margin:0 0 16px;padding:0 0 0 14px;border-left:2px solid #cccccc;font-style:italic;">${inner}</blockquote>`;
+        return `<blockquote><i>${inner}</i></blockquote>`;
       },
       hr() {
-        return `<hr style="margin:24px 0;border:0;border-top:1px solid #dddddd;">`;
+        return "<hr>";
       },
       link({ href, tokens }: Tokens.Link) {
         return `<a href="${escapeHtml(trackLink(href))}">${this.parser.parseInline(tokens)}</a>`;
@@ -67,9 +62,9 @@ function createMarked(trackLink: (url: string) => string, paragraphStyle = P) {
       list(token: Tokens.List) {
         const tag = token.ordered ? "ol" : "ul";
         const items = token.items
-          .map((item) => `<li style="margin:0 0 6px;">${this.parser.parseInline(item.tokens)}</li>`)
+          .map((item) => `<li>${this.parser.parseInline(item.tokens)}</li>`)
           .join("");
-        return `<${tag} style="margin:0 0 16px;padding-left:24px;">${items}</${tag}>`;
+        return `<${tag}>${items}</${tag}>`;
       },
       // Raw HTML in the markdown is shown as text, never injected.
       html({ text }) {
@@ -98,7 +93,7 @@ export function renderEmail(input: RenderInput) {
 
   // The unsubscribe link is never click-tracked.
   const bodyHtml = createMarked(trackLink).parse(input.body) as string;
-  const footerHtml = createMarked((url) => url, "margin:0 0 8px;font-size:13px;color:#777777;").parse(footerMd) as string;
+  const footerHtml = createMarked((url) => url).parse(footerMd) as string;
 
   // Without preview text, inboxes would show the first line; use the opening paragraph instead.
   const previewText = effectivePreviewText(input.previewText, input.body);
@@ -116,12 +111,11 @@ export function renderEmail(input: RenderInput) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(input.subject)}</title>
 </head>
-<body style="margin:0;padding:0;">
+<body>
 ${preheader}
-<div style="max-width:600px;padding:16px;font-family:${FONT};font-size:16px;line-height:1.6;">
 ${bodyHtml}
-<div style="margin-top:28px;padding-top:12px;border-top:1px solid #dddddd;">${footerHtml}</div>
-</div>
+<br>
+${footerHtml}
 ${pixel}
 </body>
 </html>`;
