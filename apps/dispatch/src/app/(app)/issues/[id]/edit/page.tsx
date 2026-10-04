@@ -381,7 +381,7 @@ export default function EditorPage() {
               sandbox=""
               srcDoc={preview.data?.html ?? ""}
               className={cn(
-                "h-full min-h-[560px] flex-none border-0 bg-[#e9e3d8] shadow-[0_20px_50px_rgba(0,0,0,0.4)] transition-[width]",
+                "h-full min-h-[560px] flex-none border-0 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] transition-[width]",
                 view === "mobile" ? "w-[375px]" : "w-full max-w-[680px]",
                 // Approximates how dark-mode mail clients invert a light email.
                 view === "dark" && "[filter:invert(0.92)_hue-rotate(180deg)]",

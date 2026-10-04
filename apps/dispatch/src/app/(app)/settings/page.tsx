@@ -136,7 +136,7 @@ export default function SettingsPage() {
         </Panel>
         <div className="flex flex-col gap-3.5 rounded-[20px] bg-[#f7f3ec] p-6 xl:w-[420px] xl:flex-none">
           <span className="font-mono text-[9px] tracking-[0.18em] text-[#8a7f6d]">AS THE READER SEES IT</span>
-          <iframe title="Footer preview" sandbox="" srcDoc={footerPreview.data ?? ""} className="h-[220px] w-full border-0" />
+          <iframe title="Footer preview" sandbox="" srcDoc={footerPreview.data ?? ""} className="h-[220px] w-full border-0 bg-white" />
         </div>
       </div>
 
