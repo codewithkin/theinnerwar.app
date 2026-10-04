@@ -145,7 +145,7 @@ export default function ReportPage() {
             <button type="button" aria-label="Close" onClick={() => setViewing(false)} className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-black/60 text-white">
               <Icon icon={Cancel01Icon} size={16} />
             </button>
-            {email.data ? <iframe title="The email" sandbox="" srcDoc={email.data.html} className="h-full w-full flex-1 border-0 bg-white" /> : <Loading />}
+            {email.data ? <iframe title="The email" sandbox="" srcDoc={email.data.html} className="h-full w-full flex-1 border-0" /> : <Loading />}
           </div>
         </div>
       ) : null}

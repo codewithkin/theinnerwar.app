@@ -58,11 +58,9 @@ describe("renderEmail", () => {
     expect(html).toContain('href="https://innerwar.app/unsubscribe?t=abc"');
   });
 
-  test("stays plain: no button, banner or background; raw HTML is escaped", () => {
+  test("a lone link becomes the ember button; raw HTML is escaped", () => {
     const { html } = renderEmail(base);
-    expect(html).toContain('<a href="https://innerwar.app">Start your first campaign</a>');
-    expect(html).not.toMatch(/background/);
-    expect(html).not.toContain("THE INNER WAR · ISSUE 19");
+    expect(html).toContain("background:#e2701f");
     expect(html).not.toContain("<script>");
     expect(html).toContain("Not a difficult hour.");
   });
